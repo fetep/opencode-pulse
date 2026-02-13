@@ -1,0 +1,16 @@
+{
+  "name": "opencode-top",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "*",
+    "@opencode-ai/sdk": "*",
+    "@types/bun": "^1.3.9",
+    "typescript": "^5.9.3"
+  }
+}
