@@ -31,6 +31,9 @@ export function dbExists(): boolean {
   return existsSync(getDbPath());
 }
 
+
+export const STALE_THRESHOLD_MS = 30_000;
+
 const SESSIONS_QUERY = `
   SELECT
     session_id,
@@ -49,6 +52,7 @@ const SESSIONS_QUERY = `
     created_at,
     updated_at
   FROM sessions
+  WHERE heartbeat_at > ?
   ORDER BY
     CASE status
       WHEN 'permission_pending' THEN 0
@@ -69,8 +73,9 @@ export function querySessions(): Session[] {
   let db: Database | null = null;
   try {
     db = new Database(dbPath, { readonly: true });
+    const cutoff = Date.now() - STALE_THRESHOLD_MS;
     const stmt = db.prepare(SESSIONS_QUERY);
-    return stmt.all() as Session[];
+    return stmt.all(cutoff) as Session[];
   } catch {
     return [];
   } finally {
@@ -78,15 +83,23 @@ export function querySessions(): Session[] {
   }
 }
 
-export const STALE_THRESHOLD_S = 30;
 
-export function isStale(session: Session): boolean {
-  const nowS = Math.floor(Date.now() / 1000);
-  const heartbeatS = Math.floor(session.heartbeat_at / 1000);
+const DEAD_THRESHOLD_MS = 120_000;
 
-  if (session.status === "retry" && session.retry_next > nowS) {
-    return false;
+export function cleanupStaleSessions(): void {
+  const dbPath = getDbPath();
+  if (!existsSync(dbPath)) {
+    return;
   }
 
-  return (nowS - heartbeatS) > STALE_THRESHOLD_S;
+  let db: Database | null = null;
+  try {
+    db = new Database(dbPath);
+    const cutoff = Date.now() - DEAD_THRESHOLD_MS;
+    db.query("DELETE FROM sessions WHERE heartbeat_at < ?").run(cutoff);
+  } catch {
+    // ignore — DB may be locked by plugin
+  } finally {
+    db?.close();
+  }
 }

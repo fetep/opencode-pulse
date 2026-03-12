@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useInput, useApp } from "ink";
-import { type Session, querySessions, isStale, dbExists } from "../db.js";
+import { type Session, querySessions, cleanupStaleSessions, dbExists } from "../db.js";
 import { attachToSession, isInsideTmux } from "../tmux.js";
+import { getTheme, type Theme } from "../theme.js";
 
 const POLL_INTERVAL_MS = 2000;
+const CLEANUP_INTERVAL_MS = 60_000;
+
+const theme = getTheme();
 
 const STATUS_ICONS: Record<string, string> = {
   permission_pending: "\u23F3",
@@ -13,21 +17,19 @@ const STATUS_ICONS: Record<string, string> = {
   busy: "\u25E6",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  permission_pending: "yellow",
-  error: "red",
-  retry: "cyan",
-  idle: "green",
-  busy: "blue",
-};
-
-function statusIcon(status: string, stale: boolean): string {
-  if (stale) return "?";
+function statusIcon(status: string): string {
   return STATUS_ICONS[status] || "?";
 }
 
 function statusColor(status: string): string {
-  return STATUS_COLORS[status] || "gray";
+  const colors: Record<string, string> = {
+    permission_pending: theme.warning,
+    error: theme.error,
+    retry: theme.info,
+    idle: theme.success,
+    busy: theme.accent,
+  };
+  return colors[status] || theme.textMuted;
 }
 
 function relativeTime(timestampMs: number): string {
@@ -67,12 +69,11 @@ function dirName(dir: string): string {
 interface SessionRowProps {
   session: Session;
   selected: boolean;
-  stale: boolean;
 }
 
-function SessionRow({ session, selected, stale }: SessionRowProps) {
-  const icon = statusIcon(session.status, stale);
-  const color = stale ? "gray" : statusColor(session.status);
+function SessionRow({ session, selected }: SessionRowProps) {
+  const icon = statusIcon(session.status);
+  const color = statusColor(session.status);
   const project = truncate(dirName(session.directory || ""), 20).padEnd(20);
   const title = session.title ? truncate(session.title, 30) : "";
   const todo = todoBar(session.todo_done, session.todo_total).padEnd(20);
@@ -81,46 +82,45 @@ function SessionRow({ session, selected, stale }: SessionRowProps) {
 
   return (
     <Box>
-      <Text color={selected ? "white" : undefined} bold={selected}>
+      <Text color={selected ? theme.text : undefined} bold={selected}>
         {selected ? "▸ " : "  "}
       </Text>
       <Text color={color}>{icon} </Text>
-      <Text color={stale ? "gray" : "white"} bold={!stale}>
+      <Text color={theme.text} bold>
         {project}
       </Text>
-      <Text color="gray"> </Text>
-      <Text color={stale ? "gray" : "yellowBright"}>
+      <Text color={theme.textMuted}> </Text>
+      <Text color={theme.warning}>
         {todo}
       </Text>
-      <Text color="gray"> </Text>
-      <Text color={stale ? "gray" : "cyan"}>
+      <Text color={theme.textMuted}> </Text>
+      <Text color={theme.info}>
         {time}
       </Text>
       {title ? (
         <>
-          <Text color="gray"> </Text>
-          <Text color={stale ? "gray" : undefined} dimColor={stale}>
+          <Text color={theme.textMuted}> </Text>
+          <Text color={theme.text}>
             {title}
           </Text>
         </>
       ) : null}
       {tmuxInfo ? (
         <>
-          <Text color="gray"> </Text>
-          <Text color="gray" dimColor>{tmuxInfo}</Text>
+          <Text color={theme.textMuted}> </Text>
+          <Text color={theme.textMuted} dimColor>{tmuxInfo}</Text>
         </>
       ) : null}
-      {stale ? <Text color="gray"> (stale)</Text> : null}
-      {!stale && session.status === "error" && session.error_message ? (
+      {session.status === "error" && session.error_message ? (
         <>
-          <Text color="gray"> </Text>
-          <Text color="red">{truncate(session.error_message, 30)}</Text>
+          <Text color={theme.textMuted}> </Text>
+          <Text color={theme.error}>{truncate(session.error_message, 30)}</Text>
         </>
       ) : null}
-      {!stale && session.status === "retry" && session.retry_message ? (
+      {session.status === "retry" && session.retry_message ? (
         <>
-          <Text color="gray"> </Text>
-          <Text color="cyan">{truncate(session.retry_message, 30)}</Text>
+          <Text color={theme.textMuted}> </Text>
+          <Text color={theme.info}>{truncate(session.retry_message, 30)}</Text>
         </>
       ) : null}
     </Box>
@@ -143,6 +143,12 @@ export function SessionList() {
     const timer = setInterval(refresh, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    cleanupStaleSessions();
+    const timer = setInterval(cleanupStaleSessions, CLEANUP_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (selectedIdx >= sessions.length && sessions.length > 0) {
@@ -185,11 +191,11 @@ export function SessionList() {
   if (!hasDb) {
     return (
       <Box flexDirection="column" paddingX={1}>
-        <Text color="yellow" bold>pulse</Text>
-        <Text color="gray">
+        <Text color={theme.primary} bold>pulse</Text>
+        <Text color={theme.textMuted}>
           Waiting for database at {process.env.PULSE_DB_PATH || "~/.local/share/opencode-pulse/status.db"}…
         </Text>
-        <Text color="gray" dimColor>
+        <Text color={theme.textMuted} dimColor>
           Install the pulse plugin in your OpenCode config to get started.
         </Text>
       </Box>
@@ -199,10 +205,10 @@ export function SessionList() {
   if (sessions.length === 0) {
     return (
       <Box flexDirection="column" paddingX={1}>
-        <Text color="yellow" bold>pulse</Text>
-        <Text color="gray">No active sessions. Polling…</Text>
+        <Text color={theme.primary} bold>pulse</Text>
+        <Text color={theme.textMuted}>No active sessions. Polling…</Text>
         <Box marginTop={1}>
-          <Text color="gray" dimColor>q: quit</Text>
+          <Text color={theme.textMuted} dimColor>q: quit</Text>
         </Box>
       </Box>
     );
@@ -211,11 +217,11 @@ export function SessionList() {
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
-        <Text color="yellow" bold>pulse</Text>
-        <Text color="gray">
+        <Text color={theme.primary} bold>pulse</Text>
+        <Text color={theme.textMuted}>
           {" "}&mdash; {sessions.length} session{sessions.length !== 1 ? "s" : ""}
         </Text>
-        {!inTmux ? <Text color="red"> (not in tmux)</Text> : null}
+        {!inTmux ? <Text color={theme.error}> (not in tmux)</Text> : null}
       </Box>
 
       <Box flexDirection="column">
@@ -224,13 +230,12 @@ export function SessionList() {
             key={session.session_id}
             session={session}
             selected={idx === selectedIdx}
-            stale={isStale(session)}
           />
         ))}
       </Box>
 
       <Box marginTop={1}>
-        <Text color="gray" dimColor>
+        <Text color={theme.textMuted} dimColor>
           j/k: navigate  enter: attach  r: refresh  q: quit
         </Text>
       </Box>
