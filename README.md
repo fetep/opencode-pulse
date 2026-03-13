@@ -1,6 +1,6 @@
 # pulse
 
-Check the pulse of your OpenCode sessions. A one-shot TUI that shows which sessions need your input, sorted by urgency — permission requests, errors, retries — so you can jump straight to what matters.
+Check the pulse of your OpenCode sessions. A one-shot TUI that shows which sessions need your input, sorted by urgency — permission requests, questions, errors, retries — so you can jump straight to what matters.
 
 Select a session and pulse attaches you to it, then exits.
 
@@ -61,7 +61,7 @@ Choose which columns to display with `--columns`. The default set balances infor
 
 | Column    | Description                                    |
 |-----------|------------------------------------------------|
-| `status`  | Session status with icon (▲ Permission, ✗ Error, ↻ Retry, ● Idle, ◦ Busy) |
+| `status`  | Session status with icon (▲ Permission, ? Question, ✗ Error, ↻ Retry, ● Idle, ◦ Busy) |
 | `project` | Project directory name                         |
 | `title`   | Session title or task description               |
 | `todo`    | Todo progress bar with done/total count        |
@@ -108,7 +108,7 @@ Two components connected by SQLite:
 - **Plugin** (`plugin/`) — OpenCode plugin that listens for session events and writes status to SQLite
 - **TUI** (`tui-ts/`) — Reads SQLite, displays sessions sorted by attention priority
 
-Sessions are sorted: ▲ permission pending → ✗ error → ↻ retry → ● idle → ◦ busy
+Sessions are sorted: ▲ permission pending → ? question → ✗ error → ↻ retry → ● idle → ◦ busy
 
 ## Troubleshooting
 

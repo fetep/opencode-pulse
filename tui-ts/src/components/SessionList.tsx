@@ -134,6 +134,7 @@ export const COLUMN_META: Record<ColumnId, ColumnMeta> = {
 
 const STATUS_ICONS: Record<string, string> = {
   permission_pending: "\u25B2",
+  question_pending: "?",
   error: "\u2717",
   retry: "\u21BB",
   idle: "\u25CF",
@@ -142,6 +143,7 @@ const STATUS_ICONS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   permission_pending: "Permission",
+  question_pending: "Question",
   error: "Error",
   retry: "Retry",
   idle: "Idle",
@@ -151,6 +153,7 @@ const STATUS_LABELS: Record<string, string> = {
 function statusColor(status: string): string {
   const colors: Record<string, string> = {
     permission_pending: theme.warning,
+    question_pending: theme.warning,
     error: theme.error,
     retry: theme.info,
     idle: theme.success,

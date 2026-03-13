@@ -60,10 +60,11 @@ const SESSIONS_QUERY = `
   ORDER BY
     CASE status
       WHEN 'permission_pending' THEN 0
-      WHEN 'error' THEN 1
-      WHEN 'retry' THEN 2
-      WHEN 'idle' THEN 3
-      WHEN 'busy' THEN 4
+      WHEN 'question_pending' THEN 1
+      WHEN 'error' THEN 2
+      WHEN 'retry' THEN 3
+      WHEN 'idle' THEN 4
+      WHEN 'busy' THEN 5
     END,
     updated_at DESC
 `;

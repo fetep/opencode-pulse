@@ -70,11 +70,13 @@ const staleSecs = Date.now() / 1000 - heartbeat_at;
 
 **Permission tracking**: `pendingPermissions` is a flat `Set<string>` of permission IDs for this process. Only clear `permission_pending` status when ALL permissions are replied.
 
+**Question tracking**: `pendingQuestions` is a flat `Set<string>` of question IDs. Mirrors permission tracking. `question_pending` status only set when no permissions are pending (permission takes priority). On reply, falls back to `permission_pending` if permissions remain, else `idle`.
+
 **Process lifecycle**: Plugin creates row on startup, deletes on `server.instance.disposed` or `process.on("exit")`. TUI cleanup verifies PIDs are still alive via `process.kill(pid, 0)`.
 
-**Session sort priority**: `permission_pending → error → retry → idle → busy` (CASE statement in SQL)
+**Session sort priority**: `permission_pending → question_pending → error → retry → idle → busy` (CASE statement in SQL)
 
-**Event filter whitelist** (10 types): `session.status`, `session.idle`, `session.created`, `session.updated`, `session.deleted`, `session.error`, `permission.asked`, `permission.replied`, `todo.updated`, `server.instance.disposed`
+**Event filter whitelist** (12 types): `session.status`, `session.idle`, `session.created`, `session.updated`, `session.deleted`, `session.error`, `permission.asked`, `permission.replied`, `question.asked`, `question.replied`, `todo.updated`, `server.instance.disposed`
 
 ## COMMANDS
 

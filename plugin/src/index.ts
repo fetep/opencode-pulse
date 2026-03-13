@@ -113,6 +113,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   }
 
   const pendingPermissions = new Set<string>();
+  const pendingQuestions = new Set<string>();
   let sessionFromEvent = false;
   const cmdlineSessionId = getSessionFromCmdline();
   debugLog(`startup: tmuxPane=${tmuxPane} dir=${project.worktree} cmdlineSession=${cmdlineSessionId}`);
@@ -340,7 +341,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
           const permId = props.requestID || props.permissionID;
           pendingPermissions.delete(permId);
           if (pendingPermissions.size === 0) {
-            upsertProcess({ status: "idle" });
+            upsertProcess({ status: pendingQuestions.size > 0 ? "question_pending" : "idle" });
           }
           break;
         }
@@ -359,11 +360,22 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         }
 
         default: {
-          // SDK types don't include 'permission.asked' (only stale 'permission.updated')
+          // SDK types don't include permission.asked, question.asked, or question.replied
           const ev = event as unknown as { type: string; properties: Record<string, string> };
           if (ev.type === "permission.asked") {
             pendingPermissions.add(ev.properties.id);
             upsertProcess({ status: "permission_pending" });
+          } else if (ev.type === "question.asked") {
+            pendingQuestions.add(ev.properties.id);
+            if (pendingPermissions.size === 0) {
+              upsertProcess({ status: "question_pending" });
+            }
+          } else if (ev.type === "question.replied") {
+            const qId = ev.properties.requestID || ev.properties.id;
+            pendingQuestions.delete(qId);
+            if (pendingQuestions.size === 0 && pendingPermissions.size === 0) {
+              upsertProcess({ status: "idle" });
+            }
           }
           break;
         }
