@@ -14,7 +14,7 @@ Add `opencode-pulse` to your OpenCode config (`~/.config/opencode/opencode.json`
 
 ```jsonc
 {
-  "plugin": ["opencode-pulse"]
+  "plugin": ["opencode-pulse@latest"]
 }
 ```
 
