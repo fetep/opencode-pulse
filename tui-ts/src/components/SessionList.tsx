@@ -141,19 +141,16 @@ export function SessionList() {
   }, []);
 
   useEffect(() => {
+    cleanupStaleSessions();
     refresh(true);
-    const timer = setInterval(() => refresh(), POLL_INTERVAL_MS);
+    const pollTimer = setInterval(() => refresh(), POLL_INTERVAL_MS);
+    const cleanupTimer = setInterval(cleanupStaleSessions, CLEANUP_INTERVAL_MS);
     return () => {
-      clearInterval(timer);
+      clearInterval(pollTimer);
+      clearInterval(cleanupTimer);
       closeDb();
     };
   }, [refresh]);
-
-  useEffect(() => {
-    cleanupStaleSessions();
-    const timer = setInterval(cleanupStaleSessions, CLEANUP_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     if (selectedIdx >= sessions.length && sessions.length > 0) {
