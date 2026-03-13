@@ -414,7 +414,7 @@ export function SessionList({ columns, onSelect }: SessionListProps) {
     if (key.name === "up" || key.name === "k") {
       setSelectedIdx((i) => (i - 1 + sessions.length) % sessions.length);
     }
-    if (key.name === "enter") {
+    if (key.name === "return") {
       const session = sessions[selectedIdx];
       if (session?.tmux_target || session?.tmux_pane) {
         onSelect(session);
