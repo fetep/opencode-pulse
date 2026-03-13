@@ -61,7 +61,7 @@ Choose which columns to display with `--columns`. The default set balances infor
 
 | Column    | Description                                    |
 |-----------|------------------------------------------------|
-| `status`  | Session status with icon (▲ Pending, ✗ Error, ↻ Retry, ● Idle, ◦ Busy) |
+| `status`  | Session status with icon (▲ Permission, ✗ Error, ↻ Retry, ● Idle, ◦ Busy) |
 | `project` | Project directory name                         |
 | `title`   | Session title or task description               |
 | `todo`    | Todo progress bar with done/total count        |

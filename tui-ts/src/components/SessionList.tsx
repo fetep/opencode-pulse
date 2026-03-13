@@ -141,7 +141,7 @@ const STATUS_ICONS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  permission_pending: "Pending",
+  permission_pending: "Permission",
   error: "Error",
   retry: "Retry",
   idle: "Idle",
