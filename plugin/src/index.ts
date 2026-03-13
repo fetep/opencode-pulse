@@ -16,6 +16,19 @@ function debugLog(msg: string) {
   } catch {}
 }
 
+function getSessionFromCmdline(): string | null {
+  try {
+    const args = readFileSync("/proc/self/cmdline", "utf-8").split("\0");
+    const idx = args.indexOf("-s");
+    if (idx !== -1 && idx + 1 < args.length && args[idx + 1]) {
+      return args[idx + 1];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function summarizeEvent(event: { type: string; properties: Record<string, unknown> }): string {
   const p = event.properties;
   switch (event.type) {
@@ -100,7 +113,9 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   }
 
   const pendingPermissions = new Set<string>();
-  debugLog(`startup: tmuxPane=${tmuxPane} dir=${project.worktree}`);
+  let sessionFromEvent = false;
+  const cmdlineSessionId = getSessionFromCmdline();
+  debugLog(`startup: tmuxPane=${tmuxPane} dir=${project.worktree} cmdlineSession=${cmdlineSessionId}`);
 
   const upsertProcess = (updates: Partial<Omit<SessionRow, "pid">>) => {
     const now = Date.now();
@@ -186,16 +201,49 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
 
   upsertProcess({});
 
-  // Query SDK for active session — populates metadata immediately on reattach
-  // (without this, `opencode -s <ses>` shows a bare row until user interacts)
+  // Populate session metadata on startup.
+  // If launched with `-s <id>`, fetch that session directly.
+  // Otherwise fall back to status-based discovery for the current directory.
   // Deferred: server isn't ready during plugin init, so we can't await here.
   setTimeout(async () => {
     try {
+      if (sessionFromEvent) {
+        debugLog("adopt: skipped, session already known from event");
+        return;
+      }
+
+      // Direct path: cmdline told us exactly which session
+      if (cmdlineSessionId) {
+        const { data: session } = await input.client.session.get({
+          path: { id: cmdlineSessionId },
+        });
+        if (session) {
+          upsertProcess({
+            session_id: session.id,
+            project_id: session.projectID,
+            directory: session.directory,
+            title: session.title,
+            opencode_version: session.version,
+          });
+          debugLog(`adopt: cmdline session id=${session.id} title="${session.title}"`);
+          return;
+        }
+        debugLog(`adopt: cmdline session ${cmdlineSessionId} not found, falling back`);
+      }
+
+      // Fallback: discover active session by directory
+      const { data: statuses } = await input.client.session.status({
+        query: { directory: project.worktree },
+      });
+      const ids = statuses ? Object.keys(statuses) : [];
+      debugLog(`adopt: status keys=[${ids.join(",")}]`);
+      if (ids.length === 0) return;
+      const activeId = ids.find((id) => statuses![id].type === "busy" || statuses![id].type === "idle");
+      if (!activeId) return;
       const { data: sessions } = await input.client.session.list({
         query: { directory: project.worktree },
       });
-      const session = sessions?.[0];
-      debugLog(`adopt: list returned ${sessions?.length ?? 0}, first=${session?.id ?? "none"}`);
+      const session = sessions?.find((s) => s.id === activeId);
       if (session) {
         upsertProcess({
           session_id: session.id,
@@ -216,6 +264,9 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   return {
     event: async ({ event }: { event: Event }) => {
       debugLog(summarizeEvent(event as unknown as { type: string; properties: Record<string, unknown> }));
+      if ("sessionID" in event.properties || (event.type === "session.created" || event.type === "session.updated")) {
+        sessionFromEvent = true;
+      }
       switch (event.type) {
         case "session.status": {
           const { sessionID, status } = event.properties;
