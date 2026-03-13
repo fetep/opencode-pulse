@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { readFileSync } from "fs";
+import { readFileSync, appendFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import type { Plugin, PluginInput, Hooks } from "@opencode-ai/plugin";
@@ -8,6 +8,46 @@ import type { Event } from "@opencode-ai/sdk";
 const DB_PATH = process.env.PULSE_DB_PATH || join(homedir(), ".local/share/opencode-pulse/status.db");
 const SCHEMA_PATH = join(import.meta.dir, "../../schema.sql");
 const HEARTBEAT_INTERVAL = 10000;
+const DEBUG_LOG = join(homedir(), ".local/share/opencode-pulse/debug.log");
+
+function debugLog(msg: string) {
+  try {
+    appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch {}
+}
+
+function summarizeEvent(event: { type: string; properties: Record<string, unknown> }): string {
+  const p = event.properties;
+  switch (event.type) {
+    case "session.diff": {
+      const diff = p.diff as Array<{ file: string; additions: number; deletions: number }> | undefined;
+      if (diff) {
+        const files = diff.map(d => `${d.file}(+${d.additions}/-${d.deletions})`).join(", ");
+        return `session.diff sid=${p.sessionID} [${files}]`;
+      }
+      return `session.diff sid=${p.sessionID}`;
+    }
+    case "message.updated": {
+      const info = p.info as Record<string, unknown> | undefined;
+      if (info) {
+        return `message.updated sid=${info.sessionID} msg=${info.id} role=${info.role}`;
+      }
+      return `message.updated ${JSON.stringify(p)}`;
+    }
+    case "message.part.updated": {
+      const part = p.part as Record<string, unknown> | undefined;
+      if (part) {
+        const state = part.state as Record<string, unknown> | undefined;
+        const status = state?.status || "";
+        const tool = part.tool || "";
+        return `message.part.updated sid=${part.sessionID} type=${part.type}${tool ? ` tool=${tool}` : ""} status=${status}`;
+      }
+      return `message.part.updated ${JSON.stringify(p)}`;
+    }
+    default:
+      return `${event.type} ${JSON.stringify(p)}`;
+  }
+}
 
 interface SessionRow {
   session_id: string;
@@ -64,6 +104,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   const pendingPermissions = new Map<string, Set<string>>();
   // Track session IDs managed by this plugin instance
   const managedSessions = new Set<string>();
+  debugLog(`startup: tmuxPane=${tmuxPane} dir=${project.worktree} managed=[${[...managedSessions].join(',')}]`);
 
   const upsertSession = (
     sessionID: string,
@@ -79,10 +120,11 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
       const fields = Object.keys(updates)
         .map((k) => `${k} = ?`)
         .join(", ");
-      const values = [...Object.values(updates), now, sessionID];
       db.query(`UPDATE sessions SET ${fields}, updated_at = ?, heartbeat_at = ? WHERE session_id = ?`).run(
-        ...values,
-        now
+        ...Object.values(updates),
+        now,
+        now,
+        sessionID
       );
     } else {
       const defaults: SessionRow = {
@@ -153,6 +195,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
 
   return {
     event: async ({ event }: { event: Event }) => {
+      debugLog(summarizeEvent(event as unknown as { type: string; properties: Record<string, unknown> }));
       switch (event.type) {
         case "session.status": {
           const { sessionID, status } = event.properties;
