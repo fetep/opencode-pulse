@@ -122,7 +122,7 @@ export const COLUMN_META: Record<ColumnId, ColumnMeta> = {
     header: "TMUX",
     minWidth: 10,
     flex: true,
-    description: "Tmux target pane",
+    description: "Tmux session name",
   },
   message: {
     header: "MESSAGE",

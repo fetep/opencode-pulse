@@ -8,7 +8,7 @@ export function execAttach(session: {
   tmux_target: string;
   tmux_pane: string;
 }): void {
-  const target = session.tmux_target || session.tmux_pane;
+  const target = session.tmux_pane || session.tmux_target;
   if (!target) return;
 
   if (isInsideTmux()) {
