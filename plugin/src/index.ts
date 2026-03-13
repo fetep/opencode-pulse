@@ -50,7 +50,8 @@ function summarizeEvent(event: { type: string; properties: Record<string, unknow
 }
 
 interface SessionRow {
-  session_id: string;
+  pid: number;
+  session_id: string | null;
   project_id: string | null;
   directory: string | null;
   title: string | null;
@@ -69,8 +70,8 @@ interface SessionRow {
 
 const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   const { project } = input;
+  const pid = process.pid;
 
-  // Capture tmux info on startup
   const tmuxPane = process.env.TMUX_PANE || null;
   let tmuxTarget: string | null = null;
   if (tmuxPane) {
@@ -82,53 +83,44 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
     }
   }
 
-  // Initialize database
   const dbDir = join(homedir(), ".local/share/opencode-pulse");
   await input.$`mkdir -p ${dbDir}`.quiet();
 
   const db = new Database(DB_PATH);
 
-  // Run schema first
   const schema = readFileSync(SCHEMA_PATH, "utf-8");
   db.exec(schema);
 
-  // Set WAL mode after schema (must be after table creation)
   db.exec("PRAGMA journal_mode = WAL");
 
   const versionRow = db.query("SELECT version FROM schema_version").get() as { version: number } | null;
-  if (!versionRow || versionRow.version !== 1) {
-    throw new Error(`Schema version mismatch: expected 1, got ${versionRow?.version}`);
+  if (!versionRow || versionRow.version !== 2) {
+    throw new Error(`Schema version mismatch: expected 2, got ${versionRow?.version}`);
   }
 
-  // Track pending permissions per session
-  const pendingPermissions = new Map<string, Set<string>>();
-  // Track session IDs managed by this plugin instance
-  const managedSessions = new Set<string>();
-  debugLog(`startup: tmuxPane=${tmuxPane} dir=${project.worktree} managed=[${[...managedSessions].join(',')}]`);
+  const pendingPermissions = new Set<string>();
+  debugLog(`startup: pid=${pid} tmuxPane=${tmuxPane} dir=${project.worktree}`);
 
-  const upsertSession = (
-    sessionID: string,
-    updates: Partial<Omit<SessionRow, "session_id">>
-  ) => {
-    managedSessions.add(sessionID);
+  const upsertProcess = (updates: Partial<Omit<SessionRow, "pid">>) => {
     const now = Date.now();
     const existing = db
-      .query("SELECT * FROM sessions WHERE session_id = ?")
-      .get(sessionID) as SessionRow | null;
+      .query("SELECT * FROM sessions WHERE pid = ?")
+      .get(pid) as SessionRow | null;
 
     if (existing) {
       const fields = Object.keys(updates)
         .map((k) => `${k} = ?`)
         .join(", ");
-      db.query(`UPDATE sessions SET ${fields}, updated_at = ?, heartbeat_at = ? WHERE session_id = ?`).run(
+      db.query(`UPDATE sessions SET ${fields}, updated_at = ?, heartbeat_at = ? WHERE pid = ?`).run(
         ...Object.values(updates),
         now,
         now,
-        sessionID
+        pid,
       );
     } else {
       const defaults: SessionRow = {
-        session_id: sessionID,
+        pid,
+        session_id: null,
         project_id: project.id,
         directory: project.worktree,
         title: null,
@@ -147,11 +139,12 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
       };
       db.query(
         `INSERT INTO sessions (
-          session_id, project_id, directory, title, status,
+          pid, session_id, project_id, directory, title, status,
           retry_message, retry_next, error_message, tmux_pane, tmux_target,
           todo_total, todo_done, heartbeat_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
+        defaults.pid,
         defaults.session_id,
         defaults.project_id,
         defaults.directory,
@@ -166,32 +159,31 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         defaults.todo_done,
         defaults.heartbeat_at,
         defaults.created_at,
-        defaults.updated_at
+        defaults.updated_at,
       );
     }
   };
 
-  const deleteSession = (sessionID: string) => {
-    db.query("DELETE FROM sessions WHERE session_id = ?").run(sessionID);
-    pendingPermissions.delete(sessionID);
-    managedSessions.delete(sessionID);
+  const cleanup = () => {
+    clearInterval(heartbeatTimer);
+    try {
+      db.query("DELETE FROM sessions WHERE pid = ?").run(pid);
+    } catch {}
+    try {
+      db.close();
+    } catch {}
   };
 
   const heartbeat = () => {
     const now = Date.now();
-    for (const sessionID of managedSessions) {
-      db.query("UPDATE sessions SET heartbeat_at = ? WHERE session_id = ?").run(now, sessionID);
-    }
+    db.query("UPDATE sessions SET heartbeat_at = ? WHERE pid = ?").run(now, pid);
   };
 
   const heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL);
 
-  process.on("exit", () => {
-    clearInterval(heartbeatTimer);
-    const now = Date.now();
-    db.query("UPDATE sessions SET updated_at = ?").run(now);
-    db.close();
-  });
+  upsertProcess({});
+
+  process.on("exit", cleanup);
 
   return {
     event: async ({ event }: { event: Event }) => {
@@ -200,11 +192,12 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         case "session.status": {
           const { sessionID, status } = event.properties;
           if (status.type === "idle") {
-            upsertSession(sessionID, { status: "idle", retry_message: null, retry_next: null });
+            upsertProcess({ session_id: sessionID, status: "idle", retry_message: null, retry_next: null });
           } else if (status.type === "busy") {
-            upsertSession(sessionID, { status: "busy" });
+            upsertProcess({ session_id: sessionID, status: "busy" });
           } else if (status.type === "retry") {
-            upsertSession(sessionID, {
+            upsertProcess({
+              session_id: sessionID,
               status: "retry",
               retry_message: status.message,
               retry_next: status.next,
@@ -215,77 +208,77 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
 
         case "session.idle": {
           const { sessionID } = event.properties;
-          upsertSession(sessionID, { status: "idle" });
+          upsertProcess({ session_id: sessionID, status: "idle" });
           break;
         }
 
         case "session.created": {
           const { info } = event.properties;
-          upsertSession(info.id, {
+          upsertProcess({
+            session_id: info.id,
             project_id: info.projectID,
             directory: info.directory,
             title: info.title,
             status: "idle",
-            created_at: info.time.created,
-            updated_at: info.time.updated,
           });
           break;
         }
 
         case "session.updated": {
           const { info } = event.properties;
-          upsertSession(info.id, {
+          upsertProcess({
+            session_id: info.id,
             project_id: info.projectID,
             directory: info.directory,
             title: info.title,
-            updated_at: info.time.updated,
           });
           break;
         }
 
         case "session.deleted": {
-          const { info } = event.properties;
-          deleteSession(info.id);
+          upsertProcess({
+            session_id: null,
+            title: null,
+            status: "idle",
+            todo_total: 0,
+            todo_done: 0,
+          });
           break;
         }
 
         case "session.error": {
           const { sessionID, error } = event.properties;
-          if (sessionID) {
-            const errorMsg = error ? JSON.stringify(error) : null;
-            upsertSession(sessionID, { status: "error", error_message: errorMsg });
-          }
+          const errorMsg = error ? JSON.stringify(error) : null;
+          upsertProcess({ session_id: sessionID, status: "error", error_message: errorMsg });
           break;
         }
 
         case "permission.updated": {
-          const { sessionID, id } = event.properties;
-          if (!pendingPermissions.has(sessionID)) {
-            pendingPermissions.set(sessionID, new Set());
-          }
-          pendingPermissions.get(sessionID)!.add(id);
-          upsertSession(sessionID, { status: "permission_pending" });
+          const { id } = event.properties;
+          pendingPermissions.add(id);
+          upsertProcess({ status: "permission_pending" });
           break;
         }
 
         case "permission.replied": {
-          const { sessionID, permissionID } = event.properties;
-          const pending = pendingPermissions.get(sessionID);
-          if (pending) {
-            pending.delete(permissionID);
-            if (pending.size === 0) {
-              pendingPermissions.delete(sessionID);
-              upsertSession(sessionID, { status: "idle" });
-            }
+          const { permissionID } = event.properties;
+          pendingPermissions.delete(permissionID);
+          if (pendingPermissions.size === 0) {
+            upsertProcess({ status: "idle" });
           }
           break;
         }
 
         case "todo.updated": {
-          const { sessionID, todos } = event.properties;
+          const { todos } = event.properties;
           const total = todos.length;
           const done = todos.filter((t) => t.status === "completed").length;
-          upsertSession(sessionID, { todo_total: total, todo_done: done });
+          upsertProcess({ todo_total: total, todo_done: done });
+          break;
+        }
+
+        case "server.instance.disposed": {
+          cleanup();
           break;
         }
 

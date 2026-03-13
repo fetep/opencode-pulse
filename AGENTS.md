@@ -66,13 +66,15 @@ const staleSecs = (Date.now() - heartbeat_at) / 1000;
 const staleSecs = Date.now() / 1000 - heartbeat_at;
 ```
 
-**Multi-instance safety**: Plugin tracks own sessions via `managedSessions` Set. Heartbeat only updates tracked sessions, not all rows.
+**PID-based tracking (v2)**: One DB row per opencode process, keyed by `pid INTEGER PRIMARY KEY`. `session_id` is a regular column tracking the current active session within the process. When sessions switch within a process, the same row updates.
 
-**Permission tracking**: `pendingPermissions` Map tracks per-session pending IDs. Only clear `permission_pending` status when ALL permissions for a session are replied.
+**Permission tracking**: `pendingPermissions` is a flat `Set<string>` of permission IDs for this process. Only clear `permission_pending` status when ALL permissions are replied.
+
+**Process lifecycle**: Plugin creates row on startup, deletes on `server.instance.disposed` or `process.on("exit")`. TUI cleanup verifies PIDs are still alive via `process.kill(pid, 0)`.
 
 **Session sort priority**: `permission_pending → error → retry → idle → busy` (CASE statement in SQL)
 
-**Event filter whitelist** (9 types): `session.status`, `session.idle`, `session.created`, `session.updated`, `session.deleted`, `session.error`, `permission.updated`, `permission.replied`, `todo.updated`
+**Event filter whitelist** (10 types): `session.status`, `session.idle`, `session.created`, `session.updated`, `session.deleted`, `session.error`, `permission.updated`, `permission.replied`, `todo.updated`, `server.instance.disposed`
 
 ## COMMANDS
 
@@ -80,12 +82,12 @@ const staleSecs = Date.now() / 1000 - heartbeat_at;
 # Plugin
 cd plugin && bun install
 cd plugin && bun run build        # builds to dist/
-cd plugin && bun run typecheck    # tsc --noEmit
+cd plugin && bunx tsc --noEmit    # typecheck (ALWAYS use bunx tsc, never bare tsc)
 
 # TUI
 cd tui-ts && bun install
 cd tui-ts && bun run start        # runs cli.tsx
-cd tui-ts && bun run typecheck    # tsc --noEmit
+cd tui-ts && bunx tsc --noEmit    # typecheck (ALWAYS use bunx tsc, never bare tsc)
 cd tui-ts && bun link             # installs `pulse` globally
 
 # Verify schema

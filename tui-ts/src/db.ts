@@ -1,11 +1,12 @@
 import { Database } from "bun:sqlite";
 import { homedir } from "os";
-import { join } from "path";
-import { existsSync } from "fs";
+import { basename, join } from "path";
+import { existsSync, readFileSync } from "fs";
 
 const DEFAULT_DB_PATH = join(homedir(), ".local/share/opencode-pulse/status.db");
 
 export interface Session {
+  pid: number;
   session_id: string;
   project_id: string;
   directory: string;
@@ -36,7 +37,8 @@ export const STALE_THRESHOLD_MS = 30_000;
 
 const SESSIONS_QUERY = `
   SELECT
-    session_id,
+    pid,
+    COALESCE(session_id, '') as session_id,
     COALESCE(project_id, '') as project_id,
     COALESCE(directory, '') as directory,
     COALESCE(title, '') as title,
@@ -100,7 +102,7 @@ export function hasDbChanged(): boolean {
     const current = row?.data_version ?? 0;
     if (_lastDataVersion === null) {
       _lastDataVersion = current;
-      return true; // first check — always load
+      return true;
     }
     if (current !== _lastDataVersion) {
       _lastDataVersion = current;
@@ -108,7 +110,6 @@ export function hasDbChanged(): boolean {
     }
     return false;
   } catch {
-    // connection may be stale — reset
     _db?.close();
     _db = null;
     _lastDataVersion = null;
@@ -123,7 +124,6 @@ export function querySessions(): Session[] {
     const stmt = db.prepare(SESSIONS_QUERY);
     return stmt.all(cutoff) as Session[];
   } catch {
-    // connection may be stale — reset
     _db?.close();
     _db = null;
     return [];
@@ -132,6 +132,16 @@ export function querySessions(): Session[] {
 
 
 const DEAD_THRESHOLD_MS = 120_000;
+
+function isPidAlive(pid: number): boolean {
+  try {
+    const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf-8");
+    const exe = cmdline.split("\0")[0];
+    return basename(exe) === "opencode";
+  } catch {
+    return false;
+  }
+}
 
 export function cleanupStaleSessions(): void {
   const dbPath = getDbPath();
@@ -142,6 +152,14 @@ export function cleanupStaleSessions(): void {
   let db: Database | null = null;
   try {
     db = new Database(dbPath);
+
+    const rows = db.query("SELECT pid FROM sessions").all() as { pid: number }[];
+    for (const row of rows) {
+      if (!isPidAlive(row.pid)) {
+        db.query("DELETE FROM sessions WHERE pid = ?").run(row.pid);
+      }
+    }
+
     const cutoff = Date.now() - DEAD_THRESHOLD_MS;
     db.query("DELETE FROM sessions WHERE heartbeat_at < ?").run(cutoff);
   } catch {

@@ -221,7 +221,7 @@ export function SessionList() {
       <Box marginBottom={1}>
         <Text color={theme.primary} bold>pulse</Text>
         <Text color={theme.textMuted}>
-          {" "}&mdash; {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+          {" "}&mdash; {sessions.length} process{sessions.length !== 1 ? "es" : ""}
         </Text>
         {!inTmux ? <Text color={theme.error}> (not in tmux)</Text> : null}
       </Box>
@@ -229,7 +229,7 @@ export function SessionList() {
       <Box flexDirection="column">
         {sessions.map((session, idx) => (
           <SessionRow
-            key={session.session_id}
+            key={session.pid}
             session={session}
             selected={idx === selectedIdx}
           />

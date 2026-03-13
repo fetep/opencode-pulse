@@ -1,12 +1,13 @@
--- Schema version 1
+-- Schema version 2: track by process ID instead of session ID
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY
 );
 
-INSERT OR IGNORE INTO schema_version (version) VALUES (1);
+INSERT OR IGNORE INTO schema_version (version) VALUES (2);
 
 CREATE TABLE IF NOT EXISTS sessions (
-    session_id    TEXT PRIMARY KEY,
+    pid           INTEGER PRIMARY KEY,
+    session_id    TEXT,
     project_id    TEXT,
     directory     TEXT,
     title         TEXT,
