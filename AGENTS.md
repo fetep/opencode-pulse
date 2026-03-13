@@ -74,7 +74,7 @@ const staleSecs = Date.now() / 1000 - heartbeat_at;
 
 **Session sort priority**: `permission_pending → error → retry → idle → busy` (CASE statement in SQL)
 
-**Event filter whitelist** (10 types): `session.status`, `session.idle`, `session.created`, `session.updated`, `session.deleted`, `session.error`, `permission.updated`, `permission.replied`, `todo.updated`, `server.instance.disposed`
+**Event filter whitelist** (10 types): `session.status`, `session.idle`, `session.created`, `session.updated`, `session.deleted`, `session.error`, `permission.asked`, `permission.replied`, `todo.updated`, `server.instance.disposed`
 
 ## COMMANDS
 

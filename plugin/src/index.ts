@@ -334,16 +334,11 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
           break;
         }
 
-        case "permission.updated": {
-          const { id } = event.properties;
-          pendingPermissions.add(id);
-          upsertProcess({ status: "permission_pending" });
-          break;
-        }
-
         case "permission.replied": {
-          const { permissionID } = event.properties;
-          pendingPermissions.delete(permissionID);
+          // SDK types define 'permissionID' but runtime sends 'requestID'
+          const props = event.properties as Record<string, string>;
+          const permId = props.requestID || props.permissionID;
+          pendingPermissions.delete(permId);
           if (pendingPermissions.size === 0) {
             upsertProcess({ status: "idle" });
           }
@@ -363,8 +358,15 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
           break;
         }
 
-        default:
+        default: {
+          // SDK types don't include 'permission.asked' (only stale 'permission.updated')
+          const ev = event as unknown as { type: string; properties: Record<string, string> };
+          if (ev.type === "permission.asked") {
+            pendingPermissions.add(ev.properties.id);
+            upsertProcess({ status: "permission_pending" });
+          }
           break;
+        }
       }
     },
   };
