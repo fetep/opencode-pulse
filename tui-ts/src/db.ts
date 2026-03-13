@@ -137,12 +137,19 @@ export function querySessions(): Session[] {
 const DEAD_THRESHOLD_MS = 120_000;
 
 function isPidAlive(pid: number): boolean {
+  // Linux: /proc verifies the process is actually opencode
   try {
     const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf-8");
     const exe = cmdline.split("\0")[0];
     return basename(exe) === "opencode";
   } catch {
-    return false;
+    // /proc unavailable (macOS) or PID gone — fall back to kill -0
+    try {
+      process.kill(pid, 0);
+      return true; // process exists (can't verify name without /proc)
+    } catch (e: any) {
+      return e.code !== "ESRCH"; // ESRCH = dead; EPERM = alive, no permission
+    }
   }
 }
 
