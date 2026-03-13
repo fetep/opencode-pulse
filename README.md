@@ -51,7 +51,7 @@ pulse
 pulse [options]
 
 Options:
-  -c, --columns <cols>  Comma-separated columns (default: status,project,todo,updated,title)
+  -c, --columns <cols>  Comma-separated columns (default: status,tmux,todo,updated,age,title)
   -h, --help            Show help
 ```
 
@@ -73,7 +73,7 @@ Choose which columns to display with `--columns`. The default set balances infor
 | `tmux`    | Tmux target pane                               |
 | `message` | Error or retry message (contextual)            |
 
-Default: `status,project,todo,updated,title`
+Default: `status,tmux,todo,updated,age,title`
 
 Examples:
 

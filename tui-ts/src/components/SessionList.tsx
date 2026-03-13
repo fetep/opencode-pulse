@@ -58,9 +58,10 @@ export const ALL_COLUMNS: ColumnId[] = [
 
 export const DEFAULT_COLUMNS: ColumnId[] = [
   "status",
-  "project",
+  "tmux",
   "todo",
   "updated",
+  "age",
   "title",
 ];
 
