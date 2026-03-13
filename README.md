@@ -4,44 +4,63 @@ Check the pulse of your OpenCode sessions. A one-shot TUI that shows which sessi
 
 Select a session and pulse attaches you to it, then exits.
 
-## Quick Start
+## Install
 
-```bash
-cd tui-ts && bun install && bun run src/cli.tsx
-```
+> **Requires [Bun](https://bun.sh)**
 
-## Setup
+### 1. Enable the plugin
 
-### 1. Build the Plugin
+Add `opencode-pulse` to your OpenCode config (`~/.config/opencode/opencode.json`):
 
-```bash
-cd plugin && bun install && bun build src/index.ts --outdir dist --target bun --format esm
-```
-
-### 2. Add Plugin to OpenCode
-
-Edit `~/.config/opencode/opencode.json`:
-
-```json
+```jsonc
 {
-  "plugin": [
-    "oh-my-opencode@latest",
-    "/path/to/opencode-whatsup/plugin"
-  ]
+  "plugin": ["opencode-pulse"]
 }
 ```
 
-### 3. Restart OpenCode
+Restart OpenCode. The plugin is installed automatically and begins tracking sessions.
 
-The plugin creates `~/.local/share/opencode-pulse/status.db` and starts tracking sessions automatically.
-
-### 4. Run pulse
+### 2. Run the TUI
 
 ```bash
-cd tui-ts && bun run src/cli.tsx
+bunx --bun opencode-pulse
+```
 
-# Or install globally
-cd tui-ts && bun link
+Or install globally for a persistent `pulse` command:
+
+```bash
+bun add -g opencode-pulse
+pulse
+```
+
+<details>
+<summary>npx</summary>
+
+```bash
+npx opencode-pulse
+```
+
+Bun must be installed — pulse uses `bun:sqlite` for database access.
+</details>
+
+### From source
+
+```bash
+git clone https://github.com/fetep/opencode-pulse
+cd opencode-pulse
+
+# Build the plugin
+cd plugin && bun install && bun run build
+
+# Register the local plugin in ~/.config/opencode/opencode.json:
+#   { "plugin": ["/path/to/opencode-pulse/plugin"] }
+# Restart OpenCode.
+
+# Run the TUI
+cd ../tui-ts && bun install && bun run start
+
+# Or link globally
+cd ../tui-ts && bun link
 pulse
 ```
 
