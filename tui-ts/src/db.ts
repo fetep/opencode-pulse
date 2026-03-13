@@ -17,6 +17,7 @@ export interface Session {
   error_message: string;
   tmux_pane: string;
   tmux_target: string;
+  opencode_version: string;
   todo_total: number;
   todo_done: number;
   heartbeat_at: number;
@@ -48,6 +49,7 @@ const SESSIONS_QUERY = `
     COALESCE(error_message, '') as error_message,
     COALESCE(tmux_pane, '') as tmux_pane,
     COALESCE(tmux_target, '') as tmux_target,
+    COALESCE(opencode_version, '') as opencode_version,
     todo_total,
     todo_done,
     heartbeat_at,

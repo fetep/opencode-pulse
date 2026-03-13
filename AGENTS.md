@@ -66,7 +66,7 @@ const staleSecs = (Date.now() - heartbeat_at) / 1000;
 const staleSecs = Date.now() / 1000 - heartbeat_at;
 ```
 
-**PID-based tracking (v2)**: One DB row per opencode process, keyed by `pid INTEGER PRIMARY KEY`. `session_id` is a regular column tracking the current active session within the process. When sessions switch within a process, the same row updates.
+**PID-based tracking (v2→v3)**: One DB row per opencode process, keyed by `pid INTEGER PRIMARY KEY`. `session_id` is a regular column tracking the current active session within the process. When sessions switch within a process, the same row updates. `opencode_version` is extracted from `session.created`/`session.updated` event's `info.version` field.
 
 **Permission tracking**: `pendingPermissions` is a flat `Set<string>` of permission IDs for this process. Only clear `permission_pending` status when ALL permissions are replied.
 

@@ -61,6 +61,7 @@ interface SessionRow {
   error_message: string | null;
   tmux_pane: string | null;
   tmux_target: string | null;
+  opencode_version: string | null;
   todo_total: number;
   todo_done: number;
   heartbeat_at: number;
@@ -94,8 +95,8 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   db.exec("PRAGMA journal_mode = WAL");
 
   const versionRow = db.query("SELECT version FROM schema_version").get() as { version: number } | null;
-  if (!versionRow || versionRow.version !== 2) {
-    throw new Error(`Schema version mismatch: expected 2, got ${versionRow?.version}`);
+  if (!versionRow || versionRow.version !== 3) {
+    throw new Error(`Schema version mismatch: expected 3, got ${versionRow?.version}`);
   }
 
   const pendingPermissions = new Set<string>();
@@ -130,6 +131,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         error_message: null,
         tmux_pane: tmuxPane,
         tmux_target: tmuxTarget,
+        opencode_version: null,
         todo_total: 0,
         todo_done: 0,
         heartbeat_at: now,
@@ -141,8 +143,8 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         `INSERT INTO sessions (
           pid, session_id, project_id, directory, title, status,
           retry_message, retry_next, error_message, tmux_pane, tmux_target,
-          todo_total, todo_done, heartbeat_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          opencode_version, todo_total, todo_done, heartbeat_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         defaults.pid,
         defaults.session_id,
@@ -155,6 +157,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         defaults.error_message,
         defaults.tmux_pane,
         defaults.tmux_target,
+        defaults.opencode_version,
         defaults.todo_total,
         defaults.todo_done,
         defaults.heartbeat_at,
@@ -219,6 +222,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
             project_id: info.projectID,
             directory: info.directory,
             title: info.title,
+            opencode_version: info.version,
             status: "idle",
           });
           break;
@@ -231,6 +235,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
             project_id: info.projectID,
             directory: info.directory,
             title: info.title,
+            opencode_version: info.version,
           });
           break;
         }

@@ -111,6 +111,12 @@ function SessionRow({ session, selected }: SessionRowProps) {
           <Text color={theme.textMuted} dimColor>{tmuxInfo}</Text>
         </>
       ) : null}
+      {session.opencode_version ? (
+        <>
+          <Text color={theme.textMuted}> </Text>
+          <Text color={theme.textMuted} dimColor>v{session.opencode_version}</Text>
+        </>
+      ) : null}
       {session.status === "error" && session.error_message ? (
         <>
           <Text color={theme.textMuted}> </Text>
