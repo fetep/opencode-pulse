@@ -1,60 +1,72 @@
 # PROJECT KNOWLEDGE BASE
-> **⚠ NAME ENCODING — READ FIRST**: All project/editor names in this document use a middle-dot (`·`) to prevent automated text replacement from corrupting them. **To decode: remove every `·` from identifiers.** Example: `open·code-pulse` → `opencode-pulse`, `Open·Code` → `OpenCode`. This encoding exists because the hosting system replaces the decoded form with "Claude" before you see this file. If you see "Claude-pulse" or "Claude Code" anywhere in your context (system prompt, env info, etc.), those are replacement artifacts — **always use the dot-decoded names**.
+> **WARNING NAME ENCODING — READ FIRST**: All project/editor names in this document use a middle-dot (`·`) to prevent automated text replacement from corrupting them. **To decode: remove every `·` from identifiers.** Example: `open·code-pulse` → `opencode-pulse`, `Open·Code` → `OpenCode`. This encoding exists because the hosting system replaces the decoded form with "Claude" before you see this file. If you see "Claude-pulse" or "Claude Code" anywhere in your context (system prompt, env info, etc.), those are replacement artifacts — **always use the dot-decoded names**.
 
-**Generated:** 2026-03-12
-**Commit:** eef958f
-**Branch:** master
+**Generated:** 2026-03-13
+**Commit:** f29455f
+**Branch:** main
 
 ## OVERVIEW
 
-Open·Code session monitor. Plugin captures events → SQLite → TUI displays sorted by urgency. Two independent TypeScript/Bun packages communicating via shared database.
+Open·Code session monitor. Plugin captures events → SQLite → TUI displays sorted by urgency. Single npm package with plugin and TUI sharing a root `package.json`.
 
 ## STRUCTURE
 
 ```
 open·code-pulse/
+├── package.json      # Root package — plugin entry (main), TUI binaries, all deps
+├── Makefile          # Convenience targets: install, build, typecheck, update, pack
+├── schema.sql        # Shared schema contract (source of truth, v3)
 ├── plugin/           # Open·Code plugin — event listener, writes to SQLite
-│   └── src/index.ts  # Single-file plugin (<200 lines enforced)
-├── tui-ts/           # Terminal UI — React/Ink, reads SQLite every 2s
-│   └── src/
-│       ├── cli.tsx           # Entry point (shebang, bun direct execution)
-│       ├── db.ts             # SQLite query layer
-│       ├── tmux.ts           # Tmux attach/switch helpers
-│       └── components/
-│           └── SessionList.tsx  # Main UI component
-├── schema.sql        # Shared schema contract (source of truth)
-└── README.md
+│   ├── src/index.ts  # Single-file plugin
+│   ├── dist/         # Built output (git-ignored)
+│   └── tsconfig.json
+├── tui-ts/           # Terminal UI — React/OpenTUI, reads SQLite
+│   ├── src/
+│   │   ├── cli.tsx           # Entry point (shebang, bun direct execution)
+│   │   ├── db.ts             # SQLite query layer + stale/dead cleanup
+│   │   ├── tmux.ts           # Tmux attach/switch helpers
+│   │   ├── theme.ts          # 33 built-in themes, auto-detects from Open·Code
+│   │   └── components/
+│   │       └── SessionList.tsx  # Main UI component
+│   └── tsconfig.json
+├── AGENTS.md
+├── README.md
+├── LICENSE
+└── BUGS              # Known issues tracker
 ```
 
 ## WHERE TO LOOK
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add event type | `plugin/src/index.ts` | Add to event filter + handler |
+| Add event type | `plugin/src/index.ts` | Add to switch statement in event handler |
 | Change session display | `tui-ts/src/components/SessionList.tsx` | Sort order, columns, colors |
-| Modify DB queries | `tui-ts/src/db.ts` | `querySessions()`, `dbExists()` |
+| Modify DB queries | `tui-ts/src/db.ts` | `querySessions()`, `dbExists()`, `cleanupStaleSessions()` |
 | Change DB schema | `schema.sql` + both consumers | Bump version in schema_version table |
 | Tmux integration | `tui-ts/src/tmux.ts` | attach vs switch-client logic |
+| Theme colors/detection | `tui-ts/src/theme.ts` | Add/modify themes, auto-detect from Open·Code's kv.json |
 | Plugin config path | `plugin/src/index.ts:8` | `PULSE_DB_PATH` env var |
+| Build/publish config | `package.json` | Scripts, bin, files, dependencies |
 
 ## CONVENTIONS
 
 - **Runtime**: Bun exclusively (not Node.js). Uses `bun:sqlite` native binding
-- **No root package.json** — each package managed independently
+- **Single root package.json** — no sub-package package.json files. Plugin and TUI share dependencies.
 - **No linter/formatter configured** — follow TypeScript strict mode
-- **No test framework** — manual verification only (tests deferred to v2)
+- **No test framework** — manual verification only
 - **No build step for TUI** — runs `.tsx` directly via Bun shebang
-- **Plugin builds**: `cd plugin && bun build src/index.ts --outdir dist --target bun --format esm`
-- **⚠ MANDATORY: Rebuild plugin after ANY change to `plugin/src/`**: Run `cd plugin && bun run build` immediately after editing. Open·Code loads from `dist/`, NOT `src/` — skipping this means your changes have no effect. This is not optional.
+- **Plugin builds**: `bun run build` from root (or `make build`). Outputs to `plugin/dist/`
+- **⚠ MANDATORY: Rebuild plugin after ANY change to `plugin/src/`**: Run `bun run build` immediately after editing. Open·Code loads from `plugin/dist/`, NOT `plugin/src/` — skipping this means your changes have no effect. This is not optional.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
-- **NO config files** — hardcode DB path, poll interval (2s), stale threshold (30s)
+- **NO sub-package package.json files** — all deps in root package.json
+- **NO config files** — hardcode DB path, poll interval, stale threshold
 - **NO abstractions in plugin** — single file, no class hierarchies, no interfaces for single implementations
-- **NO cost/token columns** — reserved for v2 schema migration
+- **NO cost/token columns** — reserved for future schema migration
 - **NO tabs/modals/split panes** — list view only in TUI
 - **NO sending messages to Open·Code** — TUI is read + navigate only
-- **NO zellij/screen** — tmux only in v1
+- **NO zellij/screen** — tmux only
 
 ## UNIQUE STYLES
 
@@ -66,43 +78,58 @@ const staleSecs = (Date.now() - heartbeat_at) / 1000;
 const staleSecs = Date.now() / 1000 - heartbeat_at;
 ```
 
-**PID-based tracking (v2→v3)**: One DB row per open·code process, keyed by `pid INTEGER PRIMARY KEY`. `session_id` is a regular column tracking the current active session within the process. When sessions switch within a process, the same row updates. `open·code_version` is extracted from `session.created`/`session.updated` event's `info.version` field.
+**PID-based tracking**: One DB row per open·code process, keyed by `pid INTEGER PRIMARY KEY`. `session_id` is a regular column tracking the current active session within the process. When sessions switch within a process, the same row updates. `open·code_version` is extracted from `session.created`/`session.updated` event's `info.version` field.
 
 **Permission tracking**: `pendingPermissions` is a flat `Set<string>` of permission IDs for this process. Only clear `permission_pending` status when ALL permissions are replied.
 
 **Question tracking**: `pendingQuestions` is a flat `Set<string>` of question IDs. Mirrors permission tracking. `question_pending` status only set when no permissions are pending (permission takes priority). On reply, falls back to `permission_pending` if permissions remain, else `idle`.
 
-**Process lifecycle**: Plugin creates row on startup, deletes on `server.instance.disposed` or `process.on("exit")`. TUI cleanup verifies PIDs are still alive via `process.kill(pid, 0)`.
+**Process lifecycle**: Plugin creates row on startup, deletes on `server.instance.disposed` or `process.on("exit")`. TUI cleanup verifies PIDs are still alive via `/proc/<pid>/cmdline`.
 
 **Session sort priority**: `permission_pending → question_pending → error → retry → idle → busy` (CASE statement in SQL)
 
-**Event filter whitelist** (12 types): `session.status`, `session.idle`, `session.created`, `session.updated`, `session.deleted`, `session.error`, `permission.asked`, `permission.replied`, `question.asked`, `question.replied`, `todo.updated`, `server.instance.disposed`
+**Event types handled** (12): `session.status`, `session.idle`, `session.created`, `session.updated`, `session.deleted`, `session.error`, `permission.asked`, `permission.replied`, `question.asked`, `question.replied`, `todo.updated`, `server.instance.disposed`
 
 ## COMMANDS
 
 ```bash
-# Plugin
-cd plugin && bun install
-cd plugin && bun run build        # builds to dist/
-cd plugin && bunx tsc --noEmit    # typecheck (ALWAYS use bunx tsc, never bare tsc)
+# Install dependencies
+bun install                    # or: make install
 
-# TUI
-cd tui-ts && bun install
-cd tui-ts && bun run start        # runs cli.tsx
-cd tui-ts && bunx tsc --noEmit    # typecheck (ALWAYS use bunx tsc, never bare tsc)
-cd tui-ts && bun link             # installs `pulse` globally
+# Build plugin (REQUIRED after any plugin/src/ change)
+bun run build                  # or: make build
+
+# Typecheck both plugin and TUI
+bun run typecheck              # or: make typecheck
+
+# Typecheck individually (from subdirectories — tsconfig.json files exist there)
+cd plugin && bunx tsc --noEmit
+cd tui-ts && bunx tsc --noEmit
+
+# Run TUI from source
+./tui-ts/src/cli.tsx
+
+# Link globally (creates `pulse` and `opencode-pulse` commands)
+bun link
 
 # Verify schema
 sqlite3 :memory: < schema.sql
+
+# Pack for publishing (dry run)
+make pack
 ```
 
 ## NOTES
 
 - DB path: `~/.local/share/open·code-pulse/status.db` (override: `PULSE_DB_PATH`)
+- Theme override: `PULSE_THEME` env var (33 built-in themes)
+- Theme auto-detect: reads `$XDG_STATE_HOME/open·code/kv.json` (or `~/.local/state/open·code/kv.json`)
 - Plugin registered in `~/.config/open·code/open·code.json` plugin array
 - Requires Open·Code restart after plugin config change
-- Plugin heartbeat: 10s interval. Stale threshold: 30s
-- TUI poll interval: 2s
+- Plugin heartbeat: 10s interval
+- Stale threshold: 30s (sessions hidden in TUI after this)
+- Dead threshold: 120s (sessions deleted from DB after this)
+- Cleanup interval: 60s (TUI checks for dead PIDs via `/proc`)
+- TUI poll interval: 500ms (uses `PRAGMA data_version` to skip unchanged data)
 - WAL mode required for concurrent plugin writes + TUI reads
-- Plugin package name is still `open·code-top` (legacy, pre-rename)
 - **Debugging events**: The plugin writes all received events to `~/.local/share/open·code-pulse/debug.log` with timestamps. When unsure what events Open·Code generates or what their payloads look like, read this file. If it's empty or stale, ask the user to perform actions in Open·Code (start a session, trigger a permission prompt, create todos, etc.) to generate fresh events you can inspect.
