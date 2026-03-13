@@ -12,7 +12,7 @@ const DEBUG_LOG = join(homedir(), ".local/share/opencode-pulse/debug.log");
 
 function debugLog(msg: string) {
   try {
-    appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] ${msg}\n`);
+    appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] [pid=${process.pid}] ${msg}\n`);
   } catch {}
 }
 
@@ -100,7 +100,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   }
 
   const pendingPermissions = new Set<string>();
-  debugLog(`startup: pid=${pid} tmuxPane=${tmuxPane} dir=${project.worktree}`);
+  debugLog(`startup: tmuxPane=${tmuxPane} dir=${project.worktree}`);
 
   const upsertProcess = (updates: Partial<Omit<SessionRow, "pid">>) => {
     const now = Date.now();
