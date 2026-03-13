@@ -1,3 +1,4 @@
+import { hostname } from "os";
 import { Fragment, useState, useEffect, useCallback } from "react";
 import {
   useKeyboard,
@@ -461,8 +462,8 @@ export function SessionList({ columns, onSelect }: SessionListProps) {
       </span>
       <span fg={theme.textMuted}>
         {" \u2014 "}
-        {sessions.length} process
-        {sessions.length !== 1 ? "es" : ""}
+        {sessions.length} opencode process
+        {sessions.length !== 1 ? "es" : ""} on {hostname()}
       </span>
       {!inTmux ? <span fg={theme.error}> (not in tmux)</span> : null}
     </text>
