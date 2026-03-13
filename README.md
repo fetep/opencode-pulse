@@ -64,6 +64,16 @@ Options:
 
 Navigation wraps — pressing up on the first item selects the last.
 
+### Tmux Popup
+
+Add this to your `~/.tmux.conf` to pop up pulse with `prefix + P`:
+
+```tmux
+bind-key P display-popup -E -w 90% -h 50% 'bunx --bun opencode-pulse'
+```
+
+Select a session and pulse switches you there, closing the popup automatically.
+
 ### Status Priority
 
 Sessions are sorted by what needs attention most:
