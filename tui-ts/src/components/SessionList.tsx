@@ -37,6 +37,7 @@ interface ColumnMeta {
   header: string;
   minWidth: number;
   flex: boolean;
+  fitContent?: boolean;
   description: string;
 }
 
@@ -120,8 +121,9 @@ export const COLUMN_META: Record<ColumnId, ColumnMeta> = {
   },
   tmux: {
     header: "TMUX",
-    minWidth: 10,
-    flex: true,
+    minWidth: 8,
+    flex: false,
+    fitContent: true,
     description: "Tmux session name",
   },
   message: {
@@ -196,10 +198,33 @@ function dirName(dir: string): string {
 const SELECTOR_WIDTH = 2;
 const COL_GAP = 2;
 
-function allocateWidths(columns: ColumnId[], totalWidth: number): number[] {
+function fitContentWidth(col: ColumnId, sessions: Session[]): number {
+  const meta = COLUMN_META[col];
+  let maxLen = meta.minWidth;
+  for (const session of sessions) {
+    let text = "";
+    switch (col) {
+      case "tmux":
+        text = session.tmux_target || session.tmux_pane || "\u2014";
+        break;
+    }
+    if (text.length > maxLen) maxLen = text.length;
+  }
+  return maxLen;
+}
+
+function allocateWidths(
+  columns: ColumnId[],
+  totalWidth: number,
+  sessions: Session[],
+): number[] {
   const available =
     totalWidth - SELECTOR_WIDTH - (columns.length - 1) * COL_GAP;
-  const widths = columns.map((c) => COLUMN_META[c].minWidth);
+  const widths = columns.map((c) => {
+    const meta = COLUMN_META[c];
+    if (meta.fitContent) return fitContentWidth(c, sessions);
+    return meta.minWidth;
+  });
   const used = widths.reduce((a, b) => a + b, 0);
   let remaining = available - used;
 
@@ -427,7 +452,7 @@ export function SessionList({ columns, onSelect }: SessionListProps) {
   });
 
   const inTmux = isInsideTmux();
-  const colWidths = allocateWidths(columns, width);
+  const colWidths = allocateWidths(columns, width, sessions);
 
   const header = (
     <text>
