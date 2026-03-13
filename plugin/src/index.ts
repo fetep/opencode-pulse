@@ -192,8 +192,18 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
     } catch {}
   };
 
-  const heartbeat = () => {
+  const heartbeat = async () => {
     const now = Date.now();
+    if (tmuxPane) {
+      try {
+        const result = await input.$`tmux display-message -p -t ${tmuxPane} '#{session_name}:#{window_index}'`.text();
+        const newTarget = result.trim();
+        if (newTarget && newTarget !== tmuxTarget) {
+          tmuxTarget = newTarget;
+          db.query("UPDATE sessions SET tmux_target = ? WHERE pid = ?").run(tmuxTarget, pid);
+        }
+      } catch {}
+    }
     db.query("UPDATE sessions SET heartbeat_at = ? WHERE pid = ?").run(now, pid);
   };
 
