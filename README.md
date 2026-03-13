@@ -10,7 +10,7 @@ Select a session and pulse attaches you to its tmux pane, then exits.
 
 ### 1. Enable the plugin
 
-Add `opencode-pulse` to your OpenCode config (`~/.config/opencode/opencode.json`):
+Add `opencode-pulse` to your OpenCode config (`~/.config/opencode/opencode.json` or `~/.config/opencode/opencode.jsonc`):
 
 ```jsonc
 {
