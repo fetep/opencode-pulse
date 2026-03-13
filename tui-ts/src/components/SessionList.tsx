@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useInput, useApp } from "ink";
-import { type Session, querySessions, cleanupStaleSessions, dbExists } from "../db.js";
+import { type Session, querySessions, cleanupStaleSessions, dbExists, hasDbChanged, closeDb } from "../db.js";
 import { attachToSession, isInsideTmux } from "../tmux.js";
 import { getTheme, type Theme } from "../theme.js";
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 500;
 const CLEANUP_INTERVAL_MS = 60_000;
 
 const theme = getTheme();
@@ -133,15 +133,20 @@ export function SessionList() {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [hasDb, setHasDb] = useState(false);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback((force = false) => {
     setHasDb(dbExists());
-    setSessions(querySessions());
+    if (force || hasDbChanged()) {
+      setSessions(querySessions());
+    }
   }, []);
 
   useEffect(() => {
-    refresh();
-    const timer = setInterval(refresh, POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
+    refresh(true);
+    const timer = setInterval(() => refresh(), POLL_INTERVAL_MS);
+    return () => {
+      clearInterval(timer);
+      closeDb();
+    };
   }, [refresh]);
 
   useEffect(() => {
@@ -181,9 +186,6 @@ export function SessionList() {
       }
     }
 
-    if (input === "r") {
-      refresh();
-    }
   });
 
   const inTmux = isInsideTmux();
@@ -236,7 +238,7 @@ export function SessionList() {
 
       <Box marginTop={1}>
         <Text color={theme.textMuted} dimColor>
-          j/k: navigate  enter: attach  r: refresh  q: quit
+          j/k: navigate  enter: attach  q: quit
         </Text>
       </Box>
     </Box>

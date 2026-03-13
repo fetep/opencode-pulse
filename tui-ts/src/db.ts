@@ -64,22 +64,69 @@ const SESSIONS_QUERY = `
     updated_at DESC
 `;
 
-export function querySessions(): Session[] {
+let _db: Database | null = null;
+
+function getDb(): Database | null {
   const dbPath = getDbPath();
   if (!existsSync(dbPath)) {
-    return [];
+    _db = null;
+    return null;
   }
-
-  let db: Database | null = null;
+  if (_db) return _db;
   try {
-    db = new Database(dbPath, { readonly: true });
+    _db = new Database(dbPath, { readonly: true });
+    return _db;
+  } catch {
+    _db = null;
+    return null;
+  }
+}
+
+export function closeDb(): void {
+  _db?.close();
+  _db = null;
+}
+
+let _lastDataVersion: number | null = null;
+
+export function hasDbChanged(): boolean {
+  const db = getDb();
+  if (!db) {
+    _lastDataVersion = null;
+    return false;
+  }
+  try {
+    const row = db.query("PRAGMA data_version").get() as { data_version: number } | null;
+    const current = row?.data_version ?? 0;
+    if (_lastDataVersion === null) {
+      _lastDataVersion = current;
+      return true; // first check — always load
+    }
+    if (current !== _lastDataVersion) {
+      _lastDataVersion = current;
+      return true;
+    }
+    return false;
+  } catch {
+    // connection may be stale — reset
+    _db?.close();
+    _db = null;
+    _lastDataVersion = null;
+    return false;
+  }
+}
+export function querySessions(): Session[] {
+  const db = getDb();
+  if (!db) return [];
+  try {
     const cutoff = Date.now() - STALE_THRESHOLD_MS;
     const stmt = db.prepare(SESSIONS_QUERY);
     return stmt.all(cutoff) as Session[];
   } catch {
+    // connection may be stale — reset
+    _db?.close();
+    _db = null;
     return [];
-  } finally {
-    db?.close();
   }
 }
 

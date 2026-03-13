@@ -50,7 +50,6 @@ pulse
 | `j` / `↓` | Move down |
 | `k` / `↑` | Move up |
 | `Enter` | Attach to selected session's tmux pane |
-| `r` | Refresh |
 | `q` / `Ctrl+C` | Quit |
 
 ## How It Works
