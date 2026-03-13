@@ -186,6 +186,31 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
 
   upsertProcess({});
 
+  // Query SDK for active session — populates metadata immediately on reattach
+  // (without this, `opencode -s <ses>` shows a bare row until user interacts)
+  // Deferred: server isn't ready during plugin init, so we can't await here.
+  setTimeout(async () => {
+    try {
+      const { data: sessions } = await input.client.session.list({
+        query: { directory: project.worktree },
+      });
+      const session = sessions?.[0];
+      debugLog(`adopt: list returned ${sessions?.length ?? 0}, first=${session?.id ?? "none"}`);
+      if (session) {
+        upsertProcess({
+          session_id: session.id,
+          project_id: session.projectID,
+          directory: session.directory,
+          title: session.title,
+          opencode_version: session.version,
+        });
+        debugLog(`adopt: success id=${session.id} title="${session.title}"`);
+      }
+    } catch (e) {
+      debugLog(`adopt: failed ${e}`);
+    }
+  }, 2000);
+
   process.on("exit", cleanup);
 
   return {
