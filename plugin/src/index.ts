@@ -16,16 +16,20 @@ function debugLog(msg: string) {
   } catch {}
 }
 
-function getSessionFromCmdline(): string | null {
+interface CmdlineFlags {
+  sessionId: string | null;  // from -s <id>
+  continueMode: boolean;     // from -c / --continue
+}
+
+function parseCmdlineFlags(): CmdlineFlags {
   try {
     const args = readFileSync("/proc/self/cmdline", "utf-8").split("\0");
-    const idx = args.indexOf("-s");
-    if (idx !== -1 && idx + 1 < args.length && args[idx + 1]) {
-      return args[idx + 1];
-    }
-    return null;
+    const sIdx = args.indexOf("-s");
+    const sessionId = (sIdx !== -1 && sIdx + 1 < args.length && args[sIdx + 1]) ? args[sIdx + 1] : null;
+    const continueMode = args.includes("-c") || args.includes("--continue");
+    return { sessionId, continueMode };
   } catch {
-    return null;
+    return { sessionId: null, continueMode: false };
   }
 }
 
@@ -115,8 +119,8 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   const pendingPermissions = new Set<string>();
   const pendingQuestions = new Set<string>();
   let sessionFromEvent = false;
-  const cmdlineSessionId = getSessionFromCmdline();
-  debugLog(`startup: tmuxPane=${tmuxPane} dir=${project.worktree} cmdlineSession=${cmdlineSessionId}`);
+  const { sessionId: cmdlineSessionId, continueMode } = parseCmdlineFlags();
+  debugLog(`startup: tmuxPane=${tmuxPane} dir=${project.worktree} cmdlineSession=${cmdlineSessionId} continue=${continueMode}`);
 
   const upsertProcess = (updates: Partial<Omit<SessionRow, "pid">>) => {
     const now = Date.now();
@@ -213,7 +217,6 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         return;
       }
 
-      // Direct path: cmdline told us exactly which session
       if (cmdlineSessionId) {
         const { data: session } = await input.client.session.get({
           path: { id: cmdlineSessionId },
@@ -232,7 +235,26 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         debugLog(`adopt: cmdline session ${cmdlineSessionId} not found, falling back`);
       }
 
-      // Fallback: discover active session by directory
+      if (continueMode) {
+        const { data: sessions } = await input.client.session.list({
+          query: { directory: project.worktree },
+        });
+        if (sessions && sessions.length > 0) {
+          const session = sessions[0];
+          upsertProcess({
+            session_id: session.id,
+            project_id: session.projectID,
+            directory: session.directory,
+            title: session.title,
+            opencode_version: session.version,
+          });
+          debugLog(`adopt: continue session id=${session.id} title="${session.title}"`);
+        } else {
+          debugLog("adopt: continue mode but no sessions found");
+        }
+        return;
+      }
+
       const { data: statuses } = await input.client.session.status({
         query: { directory: project.worktree },
       });
