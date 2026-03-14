@@ -3,7 +3,15 @@ import { homedir } from "os";
 import { basename, join } from "path";
 import { existsSync, readFileSync } from "fs";
 
-const DEFAULT_DB_PATH = join(homedir(), ".local/share/opencode-pulse/status.db");
+export const DEFAULT_DB_PATH = join(homedir(), ".local/share/opencode-pulse/status.db");
+
+let _dbPath: string = DEFAULT_DB_PATH;
+
+export function setDbPath(path: string): void {
+  _dbPath = path;
+  _db?.close();
+  _db = null;
+}
 
 export interface Session {
   pid: number;
@@ -26,7 +34,7 @@ export interface Session {
 }
 
 export function getDbPath(): string {
-  return process.env.PULSE_DB_PATH || DEFAULT_DB_PATH;
+  return _dbPath;
 }
 
 export function dbExists(): boolean {

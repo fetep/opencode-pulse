@@ -8,9 +8,9 @@ const testDir = mkdtempSync(join(tmpdir(), "pulse-db-test-"));
 const testDbPath = join(testDir, "test.db");
 const schema = readFileSync(join(import.meta.dir, "../../schema.sql"), "utf-8");
 
-process.env.PULSE_DB_PATH = testDbPath;
+const { querySessions, hasDbChanged, cleanupStaleSessions, closeDb, dbExists, getDbPath, setDbPath, STALE_THRESHOLD_MS } = await import("./db.ts");
 
-const { querySessions, hasDbChanged, cleanupStaleSessions, closeDb, dbExists, getDbPath, STALE_THRESHOLD_MS } = await import("./db.ts");
+setDbPath(testDbPath);
 
 function createTestDb(): Database {
   const db = new Database(testDbPath);
@@ -73,7 +73,7 @@ afterAll(() => {
 });
 
 describe("getDbPath", () => {
-  test("returns PULSE_DB_PATH when set", () => {
+  test("returns path set via setDbPath", () => {
     expect(getDbPath()).toBe(testDbPath);
   });
 });

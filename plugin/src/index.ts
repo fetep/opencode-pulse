@@ -1,16 +1,35 @@
 import { Database } from "bun:sqlite";
-import { readFileSync, appendFileSync } from "fs";
+import { readFileSync, appendFileSync, existsSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { parse as parseJsonc } from "jsonc-parser";
 import type { Plugin, PluginInput, Hooks } from "@opencode-ai/plugin";
 import type { Event } from "@opencode-ai/sdk";
 
-const DB_PATH = process.env.PULSE_DB_PATH || join(homedir(), ".local/share/opencode-pulse/status.db");
+const CONFIG_DIR = join(homedir(), ".config", "opencode");
+const CONFIG_PATHS = [join(CONFIG_DIR, "pulse.jsonc"), join(CONFIG_DIR, "pulse.json")];
 const SCHEMA_PATH = join(import.meta.dir, "../../schema.sql");
 const HEARTBEAT_INTERVAL = 10000;
 const DEBUG_LOG = join(homedir(), ".local/share/opencode-pulse/debug.log");
 
+function loadPluginConfig(): { debug?: boolean; dbPath?: string } {
+  for (const path of CONFIG_PATHS) {
+    if (!existsSync(path)) continue;
+    try {
+      return parseJsonc(readFileSync(path, "utf-8"));
+    } catch {
+      continue;
+    }
+  }
+  return {};
+}
+
+const pluginConfig = loadPluginConfig();
+const DEBUG_ENABLED = process.env.PULSE_DEBUG === "true" || process.env.PULSE_DEBUG === "1" || pluginConfig.debug === true;
+const DB_PATH = process.env.PULSE_DB_PATH || pluginConfig.dbPath || join(homedir(), ".local/share/opencode-pulse/status.db");
+
 function debugLog(msg: string) {
+  if (!DEBUG_ENABLED) return;
   try {
     appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] [pid=${process.pid}] ${msg}\n`);
   } catch {}
