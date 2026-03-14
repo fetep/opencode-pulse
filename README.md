@@ -62,7 +62,7 @@ Options:
 | `j` / `↓` | Move down |
 | `k` / `↑` | Move up |
 | `Enter` | Attach to selected session's tmux pane and exit |
-| `q` / `Ctrl+C` | Quit |
+| `Esc` / `q` / `Ctrl+C` | Quit |
 
 Navigation wraps — pressing up on the first item selects the last.
 
