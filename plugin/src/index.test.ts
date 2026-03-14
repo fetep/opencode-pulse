@@ -27,6 +27,8 @@ interface SessionRow {
   error_message: string | null;
   todo_total: number;
   todo_done: number;
+  subagent_count: number;
+  session_started_at: number | null;
   heartbeat_at: number;
   created_at: number;
   updated_at: number;
@@ -355,13 +357,19 @@ describe("plugin event handler", () => {
       }),
     });
 
-    await eventHandler({ event: makeEvent("session.deleted", {}) });
+    await eventHandler({
+      event: makeEvent("session.deleted", {
+        info: { id: "ses_1", projectID: "proj_1", directory: "/tmp/test", title: "", version: "1.0.0", time: { created: 0, updated: 0 } },
+      }),
+    });
     const row = getRow(verifyDb);
     expect(row?.session_id).toBeNull();
     expect(row?.title).toBeNull();
     expect(row?.status).toBe("idle");
     expect(row?.todo_total).toBe(0);
     expect(row?.todo_done).toBe(0);
+    expect(row?.subagent_count).toBe(0);
+    expect(row?.session_started_at).toBeNull();
   });
 
   test("session.error sets error status and message", async () => {
@@ -608,6 +616,185 @@ describe("plugin event handler", () => {
       event: makeEvent("session.idle", { sessionID: "ses_1" }),
     });
     expect(getRow(verifyDb)?.status).toBe("idle");
+  });
+
+  test("session.created with parentID does not overwrite main session title", async () => {
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "Main task", version: "1.0", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_sub1", projectID: "proj_1", directory: "/tmp/test", title: "Subagent task", version: "1.0", parentID: "ses_main", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    const row = getRow(verifyDb);
+    expect(row?.title).toBe("Main task");
+    expect(row?.session_id).toBe("ses_main");
+  });
+
+  test("subagent session.status busy increments subagent_count", async () => {
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "Main", version: "1.0", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_sub1", projectID: "proj_1", directory: "/tmp/test", title: "Sub", version: "1.0", parentID: "ses_main", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.status", { sessionID: "ses_sub1", status: { type: "busy" } }),
+    });
+    expect(getRow(verifyDb)?.subagent_count).toBe(1);
+  });
+
+  test("subagent session.status idle decrements subagent_count", async () => {
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "Main", version: "1.0", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_sub1", projectID: "proj_1", directory: "/tmp/test", title: "Sub", version: "1.0", parentID: "ses_main", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.status", { sessionID: "ses_sub1", status: { type: "busy" } }),
+    });
+    expect(getRow(verifyDb)?.subagent_count).toBe(1);
+    await eventHandler({
+      event: makeEvent("session.status", { sessionID: "ses_sub1", status: { type: "idle" } }),
+    });
+    expect(getRow(verifyDb)?.subagent_count).toBe(0);
+  });
+
+  test("multiple subagents tracked independently", async () => {
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "Main", version: "1.0", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_sub1", projectID: "proj_1", directory: "/tmp/test", title: "Sub 1", version: "1.0", parentID: "ses_main", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_sub2", projectID: "proj_1", directory: "/tmp/test", title: "Sub 2", version: "1.0", parentID: "ses_main", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.status", { sessionID: "ses_sub1", status: { type: "busy" } }),
+    });
+    await eventHandler({
+      event: makeEvent("session.status", { sessionID: "ses_sub2", status: { type: "busy" } }),
+    });
+    expect(getRow(verifyDb)?.subagent_count).toBe(2);
+    await eventHandler({
+      event: makeEvent("session.status", { sessionID: "ses_sub1", status: { type: "idle" } }),
+    });
+    expect(getRow(verifyDb)?.subagent_count).toBe(1);
+  });
+
+  test("session.created sets session_started_at from time.created", async () => {
+    const createdSecs = 1700000000;
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_new", projectID: "proj_1", directory: "/tmp/test", title: "Test", version: "1.0", time: { created: createdSecs, updated: createdSecs } },
+      }),
+    });
+    const row = getRow(verifyDb);
+    expect(row?.session_started_at).toBe(createdSecs * 1000);
+  });
+
+  test("session.deleted for subagent only removes that subagent", async () => {
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "Main task", version: "1.0", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_sub1", projectID: "proj_1", directory: "/tmp/test", title: "Sub", version: "1.0", parentID: "ses_main", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.status", { sessionID: "ses_sub1", status: { type: "busy" } }),
+    });
+    expect(getRow(verifyDb)?.subagent_count).toBe(1);
+    await eventHandler({
+      event: makeEvent("session.deleted", {
+        info: { id: "ses_sub1", parentID: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "", version: "1.0", time: { created: 0, updated: 0 } },
+      }),
+    });
+    const row = getRow(verifyDb);
+    expect(row?.session_id).toBe("ses_main");
+    expect(row?.title).toBe("Main task");
+    expect(row?.subagent_count).toBe(0);
+  });
+
+  test("session.deleted for main session resets everything", async () => {
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "Main", version: "1.0", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.deleted", {
+        info: { id: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "", version: "1.0", time: { created: 0, updated: 0 } },
+      }),
+    });
+    const row = getRow(verifyDb);
+    expect(row?.session_id).toBeNull();
+    expect(row?.title).toBeNull();
+    expect(row?.subagent_count).toBe(0);
+    expect(row?.session_started_at).toBeNull();
+  });
+
+  test("session.updated with parentID is ignored", async () => {
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "Main task", version: "1.0", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.updated", {
+        info: { id: "ses_sub1", parentID: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "Subagent", version: "1.0", slug: "", time: { created: 0, updated: 0 } },
+      }),
+    });
+    const row = getRow(verifyDb);
+    expect(row?.title).toBe("Main task");
+  });
+
+  test("subagent session.error decrements subagent_count", async () => {
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_main", projectID: "proj_1", directory: "/tmp/test", title: "Main", version: "1.0", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.created", {
+        info: { id: "ses_sub1", projectID: "proj_1", directory: "/tmp/test", title: "Sub", version: "1.0", parentID: "ses_main", time: { created: Date.now(), updated: Date.now() } },
+      }),
+    });
+    await eventHandler({
+      event: makeEvent("session.status", { sessionID: "ses_sub1", status: { type: "busy" } }),
+    });
+    expect(getRow(verifyDb)?.subagent_count).toBe(1);
+    await eventHandler({
+      event: makeEvent("session.error", {
+        sessionID: "ses_sub1",
+        error: { message: "subagent crashed" },
+      }),
+    });
+    const row = getRow(verifyDb);
+    expect(row?.subagent_count).toBe(0);
+    expect(row?.status).not.toBe("error");
   });
 
   test("session.status idle clears retry fields", async () => {

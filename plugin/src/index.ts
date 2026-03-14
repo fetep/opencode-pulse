@@ -16,6 +16,7 @@ const ALLOWED_UPDATE_COLUMNS = new Set([
   "session_id", "project_id", "directory", "title", "status",
   "retry_message", "retry_next", "error_message", "tmux_pane",
   "tmux_target", "opencode_version", "todo_total", "todo_done",
+  "subagent_count", "session_started_at",
 ]);
 
 const MAX_FIELD_LEN = 4096;
@@ -24,6 +25,10 @@ function truncStr(val: unknown, maxLen = MAX_FIELD_LEN): string | null {
   if (val == null) return null;
   const s = String(val);
   return s.length > maxLen ? s.slice(0, maxLen) : s;
+}
+
+function toMs(ts: number): number {
+  return ts < 1e12 ? ts * 1000 : ts;
 }
 
 function loadPluginConfig(): { debug?: boolean; dbPath?: string } {
@@ -115,6 +120,8 @@ interface SessionRow {
   opencode_version: string | null;
   todo_total: number;
   todo_done: number;
+  subagent_count: number;
+  session_started_at: number | null;
   heartbeat_at: number;
   created_at: number;
   updated_at: number;
@@ -155,15 +162,23 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   chmodSync(shmPath, 0o600);
   chmodSync(walPath, 0o600);
 
-  const versionRow = db.query("SELECT version FROM schema_version").get() as { version: number } | null;
-  if (!versionRow || versionRow.version !== 3) {
-    throw new Error(`Schema version mismatch: expected 3, got ${versionRow?.version}`);
+  const tableInfo = db.query("PRAGMA table_info(sessions)").all() as { name: string }[];
+  const columnNames = new Set(tableInfo.map(c => c.name));
+  if (!columnNames.has("subagent_count")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN subagent_count INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!columnNames.has("session_started_at")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN session_started_at INTEGER");
   }
 
   const pendingPermissions = new Set<string>();
   const pendingQuestions = new Set<string>();
   let sessionFromEvent = false;
   const { sessionId: cmdlineSessionId, continueMode } = parseCmdlineFlags();
+  let mainSessionId: string | null = cmdlineSessionId;
+  const knownSubagents = new Set<string>();
+  const activeSubagents = new Set<string>();
+  let sessionStartedAtSet = false;
   debugLog(`startup: tmuxPane=${tmuxPane} dir=${project.worktree} cmdlineSession=${cmdlineSessionId} continue=${continueMode}`);
 
   const upsertProcess = (updates: Partial<Omit<SessionRow, "pid">>) => {
@@ -201,6 +216,8 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         opencode_version: null,
         todo_total: 0,
         todo_done: 0,
+        subagent_count: 0,
+        session_started_at: null,
         heartbeat_at: now,
         created_at: now,
         updated_at: now,
@@ -210,8 +227,9 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         `INSERT INTO sessions (
           pid, session_id, project_id, directory, title, status,
           retry_message, retry_next, error_message, tmux_pane, tmux_target,
-          opencode_version, todo_total, todo_done, heartbeat_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          opencode_version, todo_total, todo_done, subagent_count, session_started_at,
+          heartbeat_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         defaults.pid,
         defaults.session_id,
@@ -227,6 +245,8 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         defaults.opencode_version,
         defaults.todo_total,
         defaults.todo_done,
+        defaults.subagent_count,
+        defaults.session_started_at,
         defaults.heartbeat_at,
         defaults.created_at,
         defaults.updated_at,
@@ -269,12 +289,17 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
           path: { id: cmdlineSessionId },
         });
         if (session) {
+          mainSessionId = session.id;
+          sessionStartedAtSet = true;
           upsertProcess({
             session_id: session.id,
             project_id: session.projectID,
             directory: session.directory,
             title: session.title,
             opencode_version: session.version,
+            session_started_at: session.time?.created
+              ? toMs(session.time.created)
+              : Date.now(),
           });
           debugLog(`adopt: cmdline session id=${session.id} title="${session.title}"`);
           return;
@@ -288,12 +313,17 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         });
         if (sessions && sessions.length > 0) {
           const session = sessions[0];
+          mainSessionId = session.id;
+          sessionStartedAtSet = true;
           upsertProcess({
             session_id: session.id,
             project_id: session.projectID,
             directory: session.directory,
             title: session.title,
             opencode_version: session.version,
+            session_started_at: session.time?.created
+              ? toMs(session.time.created)
+              : Date.now(),
           });
           debugLog(`adopt: continue session id=${session.id} title="${session.title}"`);
         } else {
@@ -315,12 +345,17 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
       });
       const session = sessions?.find((s) => s.id === activeId);
       if (session) {
+        mainSessionId = session.id;
+        sessionStartedAtSet = true;
         upsertProcess({
           session_id: session.id,
           project_id: session.projectID,
           directory: session.directory,
           title: session.title,
           opencode_version: session.version,
+          session_started_at: session.time?.created
+            ? toMs(session.time.created)
+            : Date.now(),
         });
         debugLog(`adopt: success id=${session.id} title="${session.title}"`);
       }
@@ -340,72 +375,152 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
       switch (event.type) {
         case "session.status": {
           const { sessionID, status } = event.properties;
-          if (status.type === "idle") {
-            upsertProcess({ session_id: truncStr(sessionID), status: "idle", retry_message: null, retry_next: null });
-          } else if (status.type === "busy") {
-            upsertProcess({ session_id: truncStr(sessionID), status: "busy" });
-          } else if (status.type === "retry") {
-            upsertProcess({
-              session_id: truncStr(sessionID),
-              status: "retry",
-              retry_message: truncStr(status.message),
-              retry_next: status.next,
-            });
+          const sid = truncStr(sessionID);
+
+          if (sid && knownSubagents.has(sid)) {
+            if (status.type === "busy") {
+              activeSubagents.add(sid);
+            } else {
+              activeSubagents.delete(sid);
+            }
+            upsertProcess({ subagent_count: activeSubagents.size });
+          } else {
+            if (sid && !mainSessionId) mainSessionId = sid;
+            const updates: Partial<Omit<SessionRow, "pid">> = { session_id: sid };
+            if (!sessionStartedAtSet && sid) {
+              sessionStartedAtSet = true;
+              updates.session_started_at = Date.now();
+            }
+            if (status.type === "idle") {
+              updates.status = "idle";
+              updates.retry_message = null;
+              updates.retry_next = null;
+            } else if (status.type === "busy") {
+              updates.status = "busy";
+            } else if (status.type === "retry") {
+              updates.status = "retry";
+              updates.retry_message = truncStr(status.message);
+              updates.retry_next = status.next;
+            }
+            upsertProcess(updates);
           }
           break;
         }
 
         case "session.idle": {
           const { sessionID } = event.properties;
-          upsertProcess({ session_id: truncStr(sessionID), status: "idle" });
+          const sid = truncStr(sessionID);
+
+          if (sid && knownSubagents.has(sid)) {
+            activeSubagents.delete(sid);
+            upsertProcess({ subagent_count: activeSubagents.size });
+          } else {
+            if (sid && !mainSessionId) mainSessionId = sid;
+            const updates: Partial<Omit<SessionRow, "pid">> = { session_id: sid, status: "idle" };
+            if (!sessionStartedAtSet && sid) {
+              sessionStartedAtSet = true;
+              updates.session_started_at = Date.now();
+            }
+            upsertProcess(updates);
+          }
           break;
         }
 
         case "session.created": {
           const { info } = event.properties;
-          upsertProcess({
-            session_id: truncStr(info.id),
-            project_id: truncStr(info.projectID),
-            directory: truncStr(info.directory),
-            title: truncStr(info.title),
-            opencode_version: truncStr(info.version),
-            status: "idle",
-          });
+          const sid = truncStr(info.id);
+
+          if (info.parentID) {
+            if (sid) knownSubagents.add(sid);
+            debugLog(`subagent created: ${sid} parent=${info.parentID}`);
+          } else {
+            mainSessionId = sid;
+            const updates: Partial<Omit<SessionRow, "pid">> = {
+              session_id: sid,
+              project_id: truncStr(info.projectID),
+              directory: truncStr(info.directory),
+              title: truncStr(info.title),
+              opencode_version: truncStr(info.version),
+              status: "idle",
+            };
+            if (!sessionStartedAtSet) {
+              sessionStartedAtSet = true;
+              updates.session_started_at = info.time?.created
+                ? toMs(info.time.created)
+                : Date.now();
+            }
+            upsertProcess(updates);
+          }
           break;
         }
 
         case "session.updated": {
           const { info } = event.properties;
-          upsertProcess({
-            session_id: truncStr(info.id),
+          const sid = truncStr(info.id);
+
+          if (info.parentID || (sid && knownSubagents.has(sid))) {
+            if (sid) knownSubagents.add(sid);
+            break;
+          }
+
+          mainSessionId = sid;
+          const updates: Partial<Omit<SessionRow, "pid">> = {
+            session_id: sid,
             project_id: truncStr(info.projectID),
             directory: truncStr(info.directory),
             title: truncStr(info.title),
             opencode_version: truncStr(info.version),
-          });
+          };
+          if (!sessionStartedAtSet && info.time?.created) {
+            sessionStartedAtSet = true;
+            updates.session_started_at = toMs(info.time.created);
+          }
+          upsertProcess(updates);
           break;
         }
 
         case "session.deleted": {
-          upsertProcess({
-            session_id: null,
-            title: null,
-            status: "idle",
-            todo_total: 0,
-            todo_done: 0,
-          });
+          const { info } = event.properties;
+          const sid = truncStr(info?.id);
+
+          if (sid && (info?.parentID || knownSubagents.has(sid))) {
+            knownSubagents.delete(sid);
+            activeSubagents.delete(sid);
+            upsertProcess({ subagent_count: activeSubagents.size });
+          } else {
+            mainSessionId = null;
+            sessionStartedAtSet = false;
+            activeSubagents.clear();
+            knownSubagents.clear();
+            upsertProcess({
+              session_id: null,
+              title: null,
+              status: "idle",
+              todo_total: 0,
+              todo_done: 0,
+              subagent_count: 0,
+              session_started_at: null,
+            });
+          }
           break;
         }
 
         case "session.error": {
           const { sessionID, error } = event.properties;
-          const errorMsg = error ? JSON.stringify(error) : null;
-          upsertProcess({ session_id: truncStr(sessionID), status: "error", error_message: truncStr(errorMsg) });
+          const sid = truncStr(sessionID);
+
+          if (sid && knownSubagents.has(sid)) {
+            activeSubagents.delete(sid);
+            upsertProcess({ subagent_count: activeSubagents.size });
+          } else {
+            if (sid && !mainSessionId) mainSessionId = sid;
+            const errorMsg = error ? JSON.stringify(error) : null;
+            upsertProcess({ session_id: sid, status: "error", error_message: truncStr(errorMsg) });
+          }
           break;
         }
 
         case "permission.replied": {
-          // SDK types define 'permissionID' but runtime sends 'requestID'
           const props = event.properties as Record<string, string>;
           const permId = props.requestID || props.permissionID;
           pendingPermissions.delete(permId);
@@ -429,7 +544,6 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         }
 
         default: {
-          // SDK types don't include permission.asked, question.asked, or question.replied
           const ev = event as unknown as { type: string; properties: Record<string, string> };
           if (ev.type === "permission.asked") {
             pendingPermissions.add(ev.properties.id);
