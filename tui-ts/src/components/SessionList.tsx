@@ -4,6 +4,9 @@ import {
   useRenderer,
   useTerminalDimensions,
 } from "@opentui/react";
+
+const HOSTNAME = hostname();
+
 import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   cleanupStaleSessions,
@@ -456,7 +459,7 @@ export function SessionList({ columns, onSelect }: SessionListProps) {
       <span fg={theme.textMuted}>
         {" \u2014 "}
         {sessions.length} opencode process
-        {sessions.length !== 1 ? "es" : ""} on {hostname()}
+        {sessions.length !== 1 ? "es" : ""} on {HOSTNAME}
       </span>
 
     </text>
