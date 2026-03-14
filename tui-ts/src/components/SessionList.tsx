@@ -201,6 +201,15 @@ export function dirName(dir: string): string {
   return parts[parts.length - 1] || dir;
 }
 
+/** Strip ANSI escape sequences and control characters to prevent terminal injection */
+export function stripControl(s: string): string {
+  return s
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+    .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
+    .replace(/\x1b[^[\]]/g, "")
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, "");
+}
+
 const SELECTOR_WIDTH = 2;
 const COL_GAP = 2;
 
@@ -211,7 +220,7 @@ export function fitContentWidth(col: ColumnId, sessions: Session[]): number {
     let text = "";
     switch (col) {
       case "tmux":
-        text = session.tmux_target || session.tmux_pane || "\u2014";
+        text = stripControl(session.tmux_target || session.tmux_pane) || "\u2014";
         break;
     }
     if (text.length > maxLen) maxLen = text.length;
@@ -258,7 +267,7 @@ export function renderCell(
   switch (col) {
     case "status": {
       const icon = STATUS_ICONS[session.status] || "?";
-      const label = STATUS_LABELS[session.status] || session.status;
+      const label = STATUS_LABELS[session.status] || stripControl(session.status);
       return {
         text: truncate(`${icon} ${label}`, width).padEnd(width),
         color: statusColor(session.status),
@@ -266,12 +275,12 @@ export function renderCell(
     }
     case "project":
       return {
-        text: truncate(dirName(session.directory), width).padEnd(width),
+        text: truncate(dirName(stripControl(session.directory)), width).padEnd(width),
         color: theme.text,
       };
     case "title":
       return {
-        text: truncate(session.title || "\u2014", width).padEnd(width),
+        text: truncate(stripControl(session.title) || "\u2014", width).padEnd(width),
         color: theme.text,
       };
     case "todo":
@@ -299,13 +308,13 @@ export function renderCell(
       };
     case "session":
       return {
-        text: truncate(session.session_id || "\u2014", width).padEnd(width),
+        text: truncate(stripControl(session.session_id) || "\u2014", width).padEnd(width),
         color: theme.textMuted,
       };
     case "version":
       return {
         text: truncate(
-          session.opencode_version ? `v${session.opencode_version}` : "\u2014",
+          session.opencode_version ? `v${stripControl(session.opencode_version)}` : "\u2014",
           width,
         ).padEnd(width),
         color: theme.textMuted,
@@ -313,7 +322,7 @@ export function renderCell(
     case "tmux":
       return {
         text: truncate(
-          session.tmux_target || session.tmux_pane || "\u2014",
+          stripControl(session.tmux_target || session.tmux_pane) || "\u2014",
           width,
         ).padEnd(width),
         color: theme.textMuted,
@@ -326,7 +335,7 @@ export function renderCell(
             ? session.retry_message
             : "";
       return {
-        text: truncate(msg || "\u2014", width).padEnd(width),
+        text: truncate(stripControl(msg) || "\u2014", width).padEnd(width),
         color: session.status === "error" ? theme.error : theme.info,
       };
     }

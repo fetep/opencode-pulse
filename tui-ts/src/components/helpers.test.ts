@@ -4,6 +4,7 @@ import {
   todoBar,
   truncate,
   dirName,
+  stripControl,
   allocateWidths,
   fitContentWidth,
   statusColor,
@@ -185,6 +186,44 @@ describe("dirName", () => {
 
   test("root path", () => {
     expect(dirName("/")).toBe("/");
+  });
+});
+
+describe("stripControl", () => {
+  test("passes through normal text", () => {
+    expect(stripControl("hello world")).toBe("hello world");
+  });
+
+  test("strips ANSI color codes", () => {
+    expect(stripControl("\x1b[31mred text\x1b[0m")).toBe("red text");
+  });
+
+  test("strips ANSI cursor movement", () => {
+    expect(stripControl("\x1b[2Jclear screen")).toBe("clear screen");
+  });
+
+  test("strips OSC sequences", () => {
+    expect(stripControl("\x1b]0;window title\x07rest")).toBe("rest");
+  });
+
+  test("strips C0 control characters", () => {
+    expect(stripControl("hello\x00\x01\x02world")).toBe("helloworld");
+  });
+
+  test("preserves tabs and newlines", () => {
+    expect(stripControl("hello\tworld\n")).toBe("hello\tworld\n");
+  });
+
+  test("strips C1 control characters", () => {
+    expect(stripControl("hello\x9bworld")).toBe("helloworld");
+  });
+
+  test("handles empty string", () => {
+    expect(stripControl("")).toBe("");
+  });
+
+  test("handles string with only escape sequences", () => {
+    expect(stripControl("\x1b[31m\x1b[0m")).toBe("");
   });
 });
 
