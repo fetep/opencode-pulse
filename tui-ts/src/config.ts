@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { parse as parseJsonc } from "jsonc-parser";
+import { type ParseError, parse as parseJsonc, printParseErrorCode } from "jsonc-parser";
 import {
   ALL_COLUMNS,
   type ColumnId,
@@ -34,7 +34,13 @@ function loadFileConfig(): FileConfig {
   for (const configPath of CONFIG_PATHS) {
     if (!existsSync(configPath)) continue;
     const content = readFileSync(configPath, "utf-8");
-    return parseJsonc(content) as FileConfig;
+    const errors: ParseError[] = [];
+    const result = parseJsonc(content, errors);
+    if (errors.length > 0) {
+      const messages = errors.map(e => `${printParseErrorCode(e.error)} at offset ${e.offset}`).join(", ");
+      throw new Error(`Failed to parse ${configPath}: ${messages}`);
+    }
+    return result as FileConfig;
   }
   return {};
 }
