@@ -37,6 +37,9 @@ export function parseConfigContent(content: string, filePath = "<input>"): FileC
     const messages = errors.map(e => `${printParseErrorCode(e.error)} at offset ${e.offset}`).join(", ");
     throw new Error(`Failed to parse ${filePath}: ${messages}`);
   }
+  if (typeof result !== "object" || result === null || Array.isArray(result)) {
+    throw new Error(`Expected object in ${filePath}, got ${Array.isArray(result) ? "array" : typeof result}`);
+  }
   return result as FileConfig;
 }
 
