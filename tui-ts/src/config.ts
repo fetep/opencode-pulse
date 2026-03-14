@@ -30,17 +30,21 @@ interface FileConfig {
   debug?: boolean;
 }
 
+export function parseConfigContent(content: string, filePath = "<input>"): FileConfig {
+  const errors: ParseError[] = [];
+  const result = parseJsonc(content, errors, { allowTrailingComma: true });
+  if (errors.length > 0) {
+    const messages = errors.map(e => `${printParseErrorCode(e.error)} at offset ${e.offset}`).join(", ");
+    throw new Error(`Failed to parse ${filePath}: ${messages}`);
+  }
+  return result as FileConfig;
+}
+
 function loadFileConfig(): FileConfig {
   for (const configPath of CONFIG_PATHS) {
     if (!existsSync(configPath)) continue;
     const content = readFileSync(configPath, "utf-8");
-    const errors: ParseError[] = [];
-    const result = parseJsonc(content, errors);
-    if (errors.length > 0) {
-      const messages = errors.map(e => `${printParseErrorCode(e.error)} at offset ${e.offset}`).join(", ");
-      throw new Error(`Failed to parse ${configPath}: ${messages}`);
-    }
-    return result as FileConfig;
+    return parseConfigContent(content, configPath);
   }
   return {};
 }
