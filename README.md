@@ -217,3 +217,15 @@ Events are written to `~/.local/share/opencode-pulse/debug.log` with timestamps 
 ```bash
 bun run build
 ```
+
+## Contributing
+
+```bash
+bun install
+bun run build
+make test
+```
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `refactor:`, etc.). Append `!` for breaking changes (e.g., `feat!:`).
+
+When your changes are ready, run `/pr` in OpenCode to create or update a pull request.
