@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { readFileSync, appendFileSync, existsSync } from "fs";
+import { readFileSync, appendFileSync, existsSync, mkdirSync, chmodSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { parse as parseJsonc } from "jsonc-parser";
@@ -45,7 +45,7 @@ const DB_PATH = process.env.PULSE_DB_PATH || pluginConfig.dbPath || join(homedir
 function debugLog(msg: string) {
   if (!DEBUG_ENABLED) return;
   try {
-    appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] [pid=${process.pid}] ${msg}\n`);
+    appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] [pid=${process.pid}] ${msg}\n`, { mode: 0o600 });
   } catch {}
 }
 
@@ -140,14 +140,22 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   }
 
   const dbDir = join(homedir(), ".local/share/opencode-pulse");
-  await input.$`mkdir -p ${dbDir}`.quiet();
+  mkdirSync(dbDir, { recursive: true, mode: 0o700 });
 
   const db = new Database(DB_PATH);
+  chmodSync(DB_PATH, 0o600);
+  if (existsSync(DEBUG_LOG)) chmodSync(DEBUG_LOG, 0o600);
 
   const schema = readFileSync(SCHEMA_PATH, "utf-8");
   db.exec(schema);
 
   db.exec("PRAGMA journal_mode = WAL");
+
+  // SQLite WAL mode creates two auxiliary files that also contain DB data
+  const shmPath = DB_PATH + "-shm";
+  const walPath = DB_PATH + "-wal";
+  if (existsSync(shmPath)) chmodSync(shmPath, 0o600);
+  if (existsSync(walPath)) chmodSync(walPath, 0o600);
 
   const versionRow = db.query("SELECT version FROM schema_version").get() as { version: number } | null;
   if (!versionRow || versionRow.version !== 3) {
