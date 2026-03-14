@@ -342,30 +342,6 @@ export function renderCell(
   }
 }
 
-function _buildRowText(
-  columns: ColumnId[],
-  session: Session,
-  colWidths: number[],
-): { text: string; colors: { start: number; end: number; color: string }[] } {
-  const selector = "\u25B8 ";
-  const parts: string[] = [];
-  const colors: { start: number; end: number; color: string }[] = [];
-
-  let offset = SELECTOR_WIDTH;
-  for (let i = 0; i < columns.length; i++) {
-    const cell = renderCell(columns[i], session, colWidths[i]);
-    colors.push({ start: offset, end: offset + cell.text.length, color: cell.color });
-    parts.push(cell.text);
-    offset += cell.text.length;
-    if (i < columns.length - 1) {
-      parts.push("  ");
-      offset += COL_GAP;
-    }
-  }
-
-  return { text: selector + parts.join(""), colors };
-}
-
 interface SessionRowProps {
   session: Session;
   selected: boolean;
