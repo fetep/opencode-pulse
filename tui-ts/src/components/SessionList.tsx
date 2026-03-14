@@ -1,18 +1,18 @@
-import { hostname } from "os";
-import { Fragment, useState, useEffect, useCallback } from "react";
+import { hostname } from "node:os";
 import {
   useKeyboard,
   useRenderer,
   useTerminalDimensions,
 } from "@opentui/react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import {
-  type Session,
-  querySessions,
   cleanupStaleSessions,
-  dbExists,
-  hasDbChanged,
   closeDb,
+  dbExists,
   getDbPath,
+  hasDbChanged,
+  querySessions,
+  type Session,
 } from "../db.js";
 import { getTheme, type Theme } from "../theme.js";
 
@@ -192,7 +192,7 @@ export function todoBar(done: number, total: number): string {
 export function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str;
   if (maxLen <= 1) return str.slice(0, maxLen);
-  return str.slice(0, maxLen - 1) + "\u2026";
+  return `${str.slice(0, maxLen - 1)}\u2026`;
 }
 
 export function dirName(dir: string): string {
@@ -241,7 +241,7 @@ export function allocateWidths(
     return meta.minWidth;
   });
   const used = widths.reduce((a, b) => a + b, 0);
-  let remaining = available - used;
+  const remaining = available - used;
 
   if (remaining > 0) {
     const flexIndices = columns
@@ -342,7 +342,7 @@ export function renderCell(
   }
 }
 
-function buildRowText(
+function _buildRowText(
   columns: ColumnId[],
   session: Session,
   colWidths: number[],

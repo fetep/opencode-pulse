@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 
 const origPulseTheme = process.env.PULSE_THEME;
 delete process.env.PULSE_THEME;

@@ -1,8 +1,8 @@
-import { describe, test, expect, beforeEach, afterEach, afterAll } from "bun:test";
 import { Database } from "bun:sqlite";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const testDir = mkdtempSync(join(tmpdir(), "pulse-db-test-"));
 const testDbPath = join(testDir, "test.db");
@@ -60,8 +60,8 @@ function insertSession(db: Database, overrides: Record<string, any> = {}): void 
 beforeEach(() => {
   closeDb();
   if (existsSync(testDbPath)) rmSync(testDbPath);
-  if (existsSync(testDbPath + "-wal")) rmSync(testDbPath + "-wal");
-  if (existsSync(testDbPath + "-shm")) rmSync(testDbPath + "-shm");
+  if (existsSync(`${testDbPath}-wal`)) rmSync(`${testDbPath}-wal`);
+  if (existsSync(`${testDbPath}-shm`)) rmSync(`${testDbPath}-shm`);
 });
 
 afterEach(() => {

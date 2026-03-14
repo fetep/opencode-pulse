@@ -1,4 +1,4 @@
-import { spawnSync } from "child_process";
+import { spawnSync } from "node:child_process";
 
 export function isInsideTmux(): boolean {
   return !!process.env.TMUX;

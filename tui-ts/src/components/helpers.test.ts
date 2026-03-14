@@ -1,22 +1,22 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
+import type { Session } from "../db.js";
 import {
-  relativeTime,
-  todoBar,
-  truncate,
-  dirName,
-  stripControl,
+  ALL_COLUMNS,
   allocateWidths,
+  COLUMN_META,
+  type ColumnId,
+  DEFAULT_COLUMNS,
+  dirName,
   fitContentWidth,
-  statusColor,
+  relativeTime,
   renderCell,
   STATUS_ICONS,
   STATUS_LABELS,
-  COLUMN_META,
-  DEFAULT_COLUMNS,
-  ALL_COLUMNS,
-  type ColumnId,
+  statusColor,
+  stripControl,
+  todoBar,
+  truncate,
 } from "./SessionList.js";
-import type { Session } from "../db.js";
 
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {

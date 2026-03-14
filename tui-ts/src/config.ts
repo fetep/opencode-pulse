@@ -1,14 +1,14 @@
-import { existsSync, readFileSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { parse as parseJsonc } from "jsonc-parser";
-import { readOpenCodeTheme } from "./theme.js";
 import {
-  DEFAULT_COLUMNS,
   ALL_COLUMNS,
   type ColumnId,
+  DEFAULT_COLUMNS,
 } from "./components/SessionList.js";
 import { DEFAULT_DB_PATH } from "./db.js";
+import { readOpenCodeTheme } from "./theme.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "opencode");
 const CONFIG_PATHS = [
