@@ -14,7 +14,6 @@ import {
   closeDb,
   getDbPath,
 } from "../db.js";
-import { isInsideTmux } from "../tmux.js";
 import { getTheme, type Theme } from "../theme.js";
 
 const POLL_INTERVAL_MS = 500;
@@ -458,7 +457,6 @@ export function SessionList({ columns, onSelect }: SessionListProps) {
     }
   });
 
-  const inTmux = isInsideTmux();
   const colWidths = allocateWidths(columns, width, sessions);
 
   const header = (
@@ -471,7 +469,7 @@ export function SessionList({ columns, onSelect }: SessionListProps) {
         {sessions.length} opencode process
         {sessions.length !== 1 ? "es" : ""} on {hostname()}
       </span>
-      {!inTmux ? <span fg={theme.error}> (not in tmux)</span> : null}
+
     </text>
   );
 
