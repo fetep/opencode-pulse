@@ -437,7 +437,7 @@ export function SessionList({ columns, onSelect }: SessionListProps) {
   }, [sessions.length, selectedIdx]);
 
   useKeyboard((key) => {
-    if (key.name === "q" || (key.ctrl && key.name === "c")) {
+    if (key.name === "escape" || key.name === "q" || (key.ctrl && key.name === "c")) {
       renderer.destroy();
       return;
     }
@@ -475,7 +475,7 @@ export function SessionList({ columns, onSelect }: SessionListProps) {
 
   const footer = (
     <text fg={theme.textMuted}>
-      j/k: navigate  enter: attach  q: quit
+      j/k: navigate  enter: attach  esc: quit
     </text>
   );
 
