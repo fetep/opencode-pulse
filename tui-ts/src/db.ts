@@ -30,6 +30,8 @@ export interface Session {
   opencode_version: string;
   todo_total: number;
   todo_done: number;
+  subagent_count: number;
+  session_started_at: number;
   heartbeat_at: number;
   created_at: number;
   updated_at: number;
@@ -62,6 +64,8 @@ const SESSIONS_QUERY = `
     COALESCE(opencode_version, '') as opencode_version,
     todo_total,
     todo_done,
+    COALESCE(subagent_count, 0) as subagent_count,
+    COALESCE(session_started_at, created_at) as session_started_at,
     heartbeat_at,
     created_at,
     updated_at

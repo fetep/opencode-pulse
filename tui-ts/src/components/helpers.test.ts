@@ -34,6 +34,8 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     opencode_version: "1.2.0",
     todo_total: 5,
     todo_done: 3,
+    subagent_count: 0,
+    session_started_at: Date.now() - 3600_000,
     heartbeat_at: Date.now(),
     created_at: Date.now() - 3600_000,
     updated_at: Date.now() - 60_000,
@@ -293,7 +295,7 @@ describe("allocateWidths", () => {
   test("non-flex columns get minWidth", () => {
     const cols: ColumnId[] = ["status", "pid"];
     const widths = allocateWidths(cols, 100, []);
-    expect(widths[0]).toBeGreaterThanOrEqual(12);
+    expect(widths[0]).toBeGreaterThanOrEqual(16);
     expect(widths[1]).toBeGreaterThanOrEqual(7);
   });
 
@@ -448,6 +450,24 @@ describe("renderCell", () => {
     const width = 15;
     const cell = renderCell("title", session, width);
     expect(cell.text.length).toBe(width);
+  });
+
+  test("status cell shows subagent count when > 0", () => {
+    const session = makeSession({ subagent_count: 3 });
+    const cell = renderCell("status", session, 20);
+    expect(cell.text).toContain("+3");
+  });
+
+  test("status cell omits subagent count when 0", () => {
+    const session = makeSession({ subagent_count: 0 });
+    const cell = renderCell("status", session, 20);
+    expect(cell.text).not.toContain("+");
+  });
+
+  test("age cell uses session_started_at", () => {
+    const session = makeSession({ session_started_at: Date.now() - 120_000 });
+    const cell = renderCell("age", session, 20);
+    expect(cell.text).toContain("2m ago");
   });
 
   test("cell color is a hex string", () => {

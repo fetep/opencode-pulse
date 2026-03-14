@@ -76,10 +76,10 @@ export const DEFAULT_COLUMNS: ColumnId[] = [
 export const COLUMN_META: Record<ColumnId, ColumnMeta> = {
   status: {
     header: "STATUS",
-    minWidth: 12,
+    minWidth: 16,
     flex: false,
     description:
-      "Session status with icon (\u25B2 Pending, \u2717 Error, \u21BB Retry, \u25CF Idle, \u25E6 Busy)",
+      "Session status with icon and subagent count",
   },
   project: {
     header: "PROJECT",
@@ -109,7 +109,7 @@ export const COLUMN_META: Record<ColumnId, ColumnMeta> = {
     header: "AGE",
     minWidth: 8,
     flex: false,
-    description: "Time since session was created",
+    description: "Time since main session started",
   },
   pid: {
     header: "PID",
@@ -272,8 +272,9 @@ export function renderCell(
     case "status": {
       const icon = STATUS_ICONS[session.status] || "?";
       const label = STATUS_LABELS[session.status] || stripControl(session.status);
+      const agents = session.subagent_count > 0 ? ` +${session.subagent_count}` : "";
       return {
-        text: truncate(`${icon} ${label}`, width).padEnd(width),
+        text: truncate(`${icon} ${label}${agents}`, width).padEnd(width),
         color: statusColor(session.status),
       };
     }
@@ -302,7 +303,7 @@ export function renderCell(
       };
     case "age":
       return {
-        text: truncate(relativeTime(session.created_at), width).padEnd(width),
+        text: truncate(relativeTime(session.session_started_at), width).padEnd(width),
         color: theme.textMuted,
       };
     case "pid":

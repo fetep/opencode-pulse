@@ -36,6 +36,8 @@ function insertSession(db: Database, overrides: Record<string, any> = {}): void 
     opencode_version: "1.0.0",
     todo_total: 0,
     todo_done: 0,
+    subagent_count: 0,
+    session_started_at: null,
     heartbeat_at: now,
     created_at: now,
     updated_at: now,
@@ -46,13 +48,15 @@ function insertSession(db: Database, overrides: Record<string, any> = {}): void 
     INSERT INTO sessions (
       pid, session_id, project_id, directory, title, status,
       retry_message, retry_next, error_message, tmux_pane, tmux_target,
-      opencode_version, todo_total, todo_done, heartbeat_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      opencode_version, todo_total, todo_done, subagent_count, session_started_at,
+      heartbeat_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     defaults.pid, defaults.session_id, defaults.project_id, defaults.directory,
     defaults.title, defaults.status, defaults.retry_message, defaults.retry_next,
     defaults.error_message, defaults.tmux_pane, defaults.tmux_target,
     defaults.opencode_version, defaults.todo_total, defaults.todo_done,
+    defaults.subagent_count, defaults.session_started_at,
     defaults.heartbeat_at, defaults.created_at, defaults.updated_at,
   );
 }
@@ -197,6 +201,37 @@ describe("querySessions", () => {
     expect(sessions).toHaveLength(2);
     expect(sessions[0].title).toBe("newer");
     expect(sessions[1].title).toBe("older");
+  });
+
+  test("returns subagent_count and session_started_at", () => {
+    const db = createTestDb();
+    const now = Date.now();
+    insertSession(db, {
+      pid: 10001,
+      subagent_count: 3,
+      session_started_at: now - 60_000,
+    });
+    db.close();
+
+    const sessions = querySessions();
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].subagent_count).toBe(3);
+    expect(sessions[0].session_started_at).toBe(now - 60_000);
+  });
+
+  test("session_started_at defaults to created_at when null", () => {
+    const db = createTestDb();
+    const now = Date.now();
+    insertSession(db, {
+      pid: 10001,
+      session_started_at: null,
+      created_at: now - 120_000,
+    });
+    db.close();
+
+    const sessions = querySessions();
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].session_started_at).toBe(now - 120_000);
   });
 });
 
