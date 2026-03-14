@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 const origPulseTheme = process.env.PULSE_THEME;
+const origXdgStateHome = process.env.XDG_STATE_HOME;
 delete process.env.PULSE_THEME;
 process.env.XDG_STATE_HOME = "/tmp/pulse-theme-test-nonexistent";
 
@@ -12,6 +13,11 @@ describe("getTheme", () => {
       process.env.PULSE_THEME = origPulseTheme;
     } else {
       delete process.env.PULSE_THEME;
+    }
+    if (origXdgStateHome !== undefined) {
+      process.env.XDG_STATE_HOME = origXdgStateHome;
+    } else {
+      delete process.env.XDG_STATE_HOME;
     }
   });
 
