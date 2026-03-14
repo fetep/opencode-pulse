@@ -353,9 +353,11 @@ const themes: Record<string, Theme> = {
 };
 
 let _themeName: string | null = null;
+let _cachedTheme: Theme | null = null;
 
 export function setThemeName(name: string): void {
   _themeName = name;
+  _cachedTheme = null;
 }
 
 export function readOpenCodeTheme(): string | null {
@@ -376,6 +378,9 @@ export function readOpenCodeTheme(): string | null {
 }
 
 export function getTheme(): Theme {
+  if (_cachedTheme) return _cachedTheme;
   const name = _themeName || process.env.PULSE_THEME || readOpenCodeTheme() || "opencode";
-  return themes[name] || themes.opencode;
+  const resolved = themes[name] || themes.opencode;
+  if (_themeName) _cachedTheme = resolved;
+  return resolved;
 }

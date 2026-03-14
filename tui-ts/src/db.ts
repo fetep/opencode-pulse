@@ -104,6 +104,10 @@ export function closeDb(): void {
   _db = null;
 }
 
+export function warmDb(): void {
+  getDb();
+}
+
 let _lastDataVersion: number | null = null;
 
 export function hasDbChanged(): boolean {

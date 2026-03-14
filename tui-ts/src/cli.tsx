@@ -11,7 +11,7 @@ import {
 } from "./components/SessionList.js";
 import { execAttach } from "./tmux.js";
 import { resolveConfig } from "./config.js";
-import { setDbPath } from "./db.js";
+import { setDbPath, warmDb } from "./db.js";
 import { setThemeName } from "./theme.js";
 
 const main = defineCommand({
@@ -43,6 +43,7 @@ const main = defineCommand({
     const config = resolveConfig(args);
     setDbPath(config.dbPath);
     setThemeName(config.theme);
+    warmDb();
 
     type SessionTarget = { tmux_target: string; tmux_pane: string };
     let selectedSession: SessionTarget | null = null;
