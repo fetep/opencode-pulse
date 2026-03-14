@@ -78,11 +78,13 @@ const SESSIONS_QUERY = `
 `;
 
 let _db: Database | null = null;
+let _sessionsStmt: ReturnType<Database["prepare"]> | null = null;
 
 function getDb(): Database | null {
   const dbPath = getDbPath();
   if (!existsSync(dbPath)) {
     _db = null;
+    _sessionsStmt = null;
     return null;
   }
   if (_db) return _db;
@@ -91,11 +93,13 @@ function getDb(): Database | null {
     return _db;
   } catch {
     _db = null;
+    _sessionsStmt = null;
     return null;
   }
 }
 
 export function closeDb(): void {
+  _sessionsStmt = null;
   _db?.close();
   _db = null;
 }
@@ -131,10 +135,13 @@ export function querySessions(): Session[] {
   const db = getDb();
   if (!db) return [];
   try {
+    if (!_sessionsStmt) {
+      _sessionsStmt = db.prepare(SESSIONS_QUERY);
+    }
     const cutoff = Date.now() - STALE_THRESHOLD_MS;
-    const stmt = db.prepare(SESSIONS_QUERY);
-    return stmt.all(cutoff) as Session[];
+    return _sessionsStmt.all(cutoff) as Session[];
   } catch {
+    _sessionsStmt = null;
     _db?.close();
     _db = null;
     return [];
