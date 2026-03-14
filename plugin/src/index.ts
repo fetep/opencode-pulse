@@ -12,6 +12,20 @@ const SCHEMA_PATH = join(import.meta.dir, "../../schema.sql");
 const HEARTBEAT_INTERVAL = 10000;
 const DEBUG_LOG = join(homedir(), ".local/share/opencode-pulse/debug.log");
 
+const ALLOWED_UPDATE_COLUMNS = new Set([
+  "session_id", "project_id", "directory", "title", "status",
+  "retry_message", "retry_next", "error_message", "tmux_pane",
+  "tmux_target", "opencode_version", "todo_total", "todo_done",
+]);
+
+const MAX_FIELD_LEN = 4096;
+
+function truncStr(val: unknown, maxLen = MAX_FIELD_LEN): string | null {
+  if (val == null) return null;
+  const s = String(val);
+  return s.length > maxLen ? s.slice(0, maxLen) : s;
+}
+
 function loadPluginConfig(): { debug?: boolean; dbPath?: string } {
   for (const path of CONFIG_PATHS) {
     if (!existsSync(path)) continue;
@@ -153,15 +167,18 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
       .get(pid) as SessionRow | null;
 
     if (existing) {
-      const fields = Object.keys(updates)
-        .map((k) => `${k} = ?`)
-        .join(", ");
-      db.query(`UPDATE sessions SET ${fields}, updated_at = ?, heartbeat_at = ? WHERE pid = ?`).run(
-        ...Object.values(updates),
-        now,
-        now,
-        pid,
-      );
+      const entries = Object.entries(updates).filter(([k]) => ALLOWED_UPDATE_COLUMNS.has(k));
+      if (entries.length > 0) {
+        const fields = entries.map(([k]) => `${k} = ?`).join(", ");
+        db.query(`UPDATE sessions SET ${fields}, updated_at = ?, heartbeat_at = ? WHERE pid = ?`).run(
+          ...entries.map(([, v]) => v),
+          now,
+          now,
+          pid,
+        );
+      } else {
+        db.query("UPDATE sessions SET updated_at = ?, heartbeat_at = ? WHERE pid = ?").run(now, now, pid);
+      }
     } else {
       const defaults: SessionRow = {
         pid,
@@ -318,14 +335,14 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         case "session.status": {
           const { sessionID, status } = event.properties;
           if (status.type === "idle") {
-            upsertProcess({ session_id: sessionID, status: "idle", retry_message: null, retry_next: null });
+            upsertProcess({ session_id: truncStr(sessionID), status: "idle", retry_message: null, retry_next: null });
           } else if (status.type === "busy") {
-            upsertProcess({ session_id: sessionID, status: "busy" });
+            upsertProcess({ session_id: truncStr(sessionID), status: "busy" });
           } else if (status.type === "retry") {
             upsertProcess({
-              session_id: sessionID,
+              session_id: truncStr(sessionID),
               status: "retry",
-              retry_message: status.message,
+              retry_message: truncStr(status.message),
               retry_next: status.next,
             });
           }
@@ -334,18 +351,18 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
 
         case "session.idle": {
           const { sessionID } = event.properties;
-          upsertProcess({ session_id: sessionID, status: "idle" });
+          upsertProcess({ session_id: truncStr(sessionID), status: "idle" });
           break;
         }
 
         case "session.created": {
           const { info } = event.properties;
           upsertProcess({
-            session_id: info.id,
-            project_id: info.projectID,
-            directory: info.directory,
-            title: info.title,
-            opencode_version: info.version,
+            session_id: truncStr(info.id),
+            project_id: truncStr(info.projectID),
+            directory: truncStr(info.directory),
+            title: truncStr(info.title),
+            opencode_version: truncStr(info.version),
             status: "idle",
           });
           break;
@@ -354,11 +371,11 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         case "session.updated": {
           const { info } = event.properties;
           upsertProcess({
-            session_id: info.id,
-            project_id: info.projectID,
-            directory: info.directory,
-            title: info.title,
-            opencode_version: info.version,
+            session_id: truncStr(info.id),
+            project_id: truncStr(info.projectID),
+            directory: truncStr(info.directory),
+            title: truncStr(info.title),
+            opencode_version: truncStr(info.version),
           });
           break;
         }
@@ -377,7 +394,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         case "session.error": {
           const { sessionID, error } = event.properties;
           const errorMsg = error ? JSON.stringify(error) : null;
-          upsertProcess({ session_id: sessionID, status: "error", error_message: errorMsg });
+          upsertProcess({ session_id: truncStr(sessionID), status: "error", error_message: truncStr(errorMsg) });
           break;
         }
 
