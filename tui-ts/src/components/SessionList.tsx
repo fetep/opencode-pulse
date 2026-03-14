@@ -413,14 +413,18 @@ export function SessionList({ columns, onSelect }: SessionListProps) {
   }, []);
 
   useEffect(() => {
-    cleanupStaleSessions();
+    // Show data first — cleanup is deferred so the UI renders immediately.
+    // Dead sessions are already filtered by the query's WHERE clause,
+    // so deferring cleanup has no visible effect on the initial frame.
     refresh(true);
+    const cleanupTimeout = setTimeout(cleanupStaleSessions, 50);
     const pollTimer = setInterval(() => refresh(), POLL_INTERVAL_MS);
     const cleanupTimer = setInterval(
       cleanupStaleSessions,
       CLEANUP_INTERVAL_MS,
     );
     return () => {
+      clearTimeout(cleanupTimeout);
       clearInterval(pollTimer);
       clearInterval(cleanupTimer);
       closeDb();
