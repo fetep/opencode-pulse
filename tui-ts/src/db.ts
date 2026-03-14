@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
-import { homedir } from "os";
-import { basename, join } from "path";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, join } from "node:path";
 
 export const DEFAULT_DB_PATH = join(homedir(), ".local/share/opencode-pulse/status.db");
 
@@ -166,8 +166,8 @@ function isPidAlive(pid: number): boolean {
     try {
       process.kill(pid, 0);
       return true; // process exists (can't verify name without /proc)
-    } catch (e: any) {
-      return e.code !== "ESRCH"; // ESRCH = dead; EPERM = alive, no permission
+    } catch (e: unknown) {
+      return (e as NodeJS.ErrnoException).code !== "ESRCH"; // ESRCH = dead; EPERM = alive, no permission
     }
   }
 }

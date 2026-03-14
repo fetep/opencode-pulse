@@ -1,10 +1,10 @@
 import { Database } from "bun:sqlite";
-import { readFileSync, appendFileSync, existsSync, mkdirSync, chmodSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
-import { parse as parseJsonc } from "jsonc-parser";
-import type { Plugin, PluginInput, Hooks } from "@opencode-ai/plugin";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import type { Hooks, Plugin, PluginInput } from "@opencode-ai/plugin";
 import type { Event } from "@opencode-ai/sdk";
+import { parse as parseJsonc } from "jsonc-parser";
 
 const CONFIG_DIR = join(homedir(), ".config", "opencode");
 const CONFIG_PATHS = [join(CONFIG_DIR, "pulse.jsonc"), join(CONFIG_DIR, "pulse.json")];
@@ -148,8 +148,8 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   db.exec("PRAGMA journal_mode = WAL");
 
   // SQLite WAL mode creates two auxiliary files that also contain DB data
-  const shmPath = DB_PATH + "-shm";
-  const walPath = DB_PATH + "-wal";
+  const shmPath = `${DB_PATH}-shm`;
+  const walPath = `${DB_PATH}-wal`;
   if (existsSync(shmPath)) chmodSync(shmPath, 0o600);
   if (existsSync(walPath)) chmodSync(walPath, 0o600);
 
@@ -306,7 +306,7 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
       const ids = statuses ? Object.keys(statuses) : [];
       debugLog(`adopt: status keys=[${ids.join(",")}]`);
       if (ids.length === 0) return;
-      const activeId = ids.find((id) => statuses![id].type === "busy" || statuses![id].type === "idle");
+      const activeId = ids.find((id) => statuses?.[id].type === "busy" || statuses?.[id].type === "idle");
       if (!activeId) return;
       const { data: sessions } = await input.client.session.list({
         query: { directory: project.worktree },

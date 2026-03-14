@@ -33,6 +33,7 @@ open·code-pulse/
 │   │       ├── SessionList.tsx   # Main UI component
 │   │       └── helpers.test.ts  # SessionList helper function tests
 │   └── tsconfig.json
+├── biome.json        # Biome linter config (lint-only, no formatter)
 ├── AGENTS.md
 ├── README.md
 ├── LICENSE
@@ -56,7 +57,7 @@ open·code-pulse/
 
 - **Runtime**: Bun exclusively (not Node.js). Uses `bun:sqlite` native binding
 - **Single root package.json** — no sub-package package.json files. Plugin and TUI share dependencies.
-- **No linter/formatter configured** — follow TypeScript strict mode
+- **Biome linter** — lint-only (no formatter). Config in `biome.json`. Run `bunx biome ci .` or `bunx biome check .`
 - **Testing**: `bun:test` framework. Tests co-located with source (`*.test.ts`)
 - **No build step for TUI** — runs `.tsx` directly via Bun shebang
 - **Plugin builds**: `bun run build` from root (or `make build`). Outputs to `plugin/dist/`
@@ -116,6 +117,9 @@ bun run build                  # or: make build
 
 # Typecheck both plugin and TUI
 bun run typecheck              # or: make typecheck
+
+# Lint (REQUIRED after any code change)
+bunx biome ci .                # or: bunx biome check .
 
 # Run tests (REQUIRED after any code change)
 bun test                       # or: make test

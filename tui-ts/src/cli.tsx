@@ -1,18 +1,17 @@
 #!/usr/bin/env bun
-import { defineCommand, runMain, renderUsage, type CommandDef, type ArgsDef } from "citty";
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
+import { type ArgsDef, type CommandDef, defineCommand, renderUsage, runMain } from "citty";
 import {
-  SessionList,
-  DEFAULT_COLUMNS,
   ALL_COLUMNS,
   COLUMN_META,
-  type ColumnId,
+  DEFAULT_COLUMNS,
+  SessionList,
 } from "./components/SessionList.js";
-import { execAttach } from "./tmux.js";
 import { resolveConfig } from "./config.js";
 import { setDbPath, warmDb } from "./db.js";
 import { setThemeName } from "./theme.js";
+import { execAttach } from "./tmux.js";
 
 const main = defineCommand({
   meta: {

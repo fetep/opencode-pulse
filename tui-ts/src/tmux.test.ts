@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { TMUX_TARGET_RE } from "./tmux.js";
 
 describe("TMUX_TARGET_RE", () => {

@@ -1,8 +1,8 @@
-import { describe, test, expect, beforeEach, afterEach, afterAll } from "bun:test";
 import { Database } from "bun:sqlite";
-import { mkdtempSync, rmSync, existsSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const testDir = mkdtempSync(join(tmpdir(), "pulse-plugin-test-"));
 const testDbPath = join(testDir, "test.db");
@@ -203,8 +203,8 @@ describe("plugin event handler", () => {
 
   beforeEach(async () => {
     if (existsSync(testDbPath)) rmSync(testDbPath);
-    if (existsSync(testDbPath + "-wal")) rmSync(testDbPath + "-wal");
-    if (existsSync(testDbPath + "-shm")) rmSync(testDbPath + "-shm");
+    if (existsSync(`${testDbPath}-wal`)) rmSync(`${testDbPath}-wal`);
+    if (existsSync(`${testDbPath}-shm`)) rmSync(`${testDbPath}-shm`);
 
     const hooks = await createPlugin(createMockInput());
     eventHandler = hooks.event!;
@@ -227,12 +227,12 @@ describe("plugin event handler", () => {
   test("creates initial row on startup", () => {
     const row = getRow(verifyDb);
     expect(row).not.toBeNull();
-    expect(row!.pid).toBe(process.pid);
-    expect(row!.status).toBe("idle");
-    expect(row!.directory).toBe("/tmp/test-project");
-    expect(row!.project_id).toBe("test-project");
-    expect(row!.todo_total).toBe(0);
-    expect(row!.todo_done).toBe(0);
+    expect(row?.pid).toBe(process.pid);
+    expect(row?.status).toBe("idle");
+    expect(row?.directory).toBe("/tmp/test-project");
+    expect(row?.project_id).toBe("test-project");
+    expect(row?.todo_total).toBe(0);
+    expect(row?.todo_done).toBe(0);
   });
 
   test("session.status idle updates status and session_id", async () => {
@@ -243,10 +243,10 @@ describe("plugin event handler", () => {
       }),
     });
     const row = getRow(verifyDb);
-    expect(row!.status).toBe("idle");
-    expect(row!.session_id).toBe("ses_1");
-    expect(row!.retry_message).toBeNull();
-    expect(row!.retry_next).toBeNull();
+    expect(row?.status).toBe("idle");
+    expect(row?.session_id).toBe("ses_1");
+    expect(row?.retry_message).toBeNull();
+    expect(row?.retry_next).toBeNull();
   });
 
   test("session.status busy updates status", async () => {
@@ -257,8 +257,8 @@ describe("plugin event handler", () => {
       }),
     });
     const row = getRow(verifyDb);
-    expect(row!.status).toBe("busy");
-    expect(row!.session_id).toBe("ses_1");
+    expect(row?.status).toBe("busy");
+    expect(row?.session_id).toBe("ses_1");
   });
 
   test("session.status retry updates with retry info", async () => {
@@ -270,9 +270,9 @@ describe("plugin event handler", () => {
       }),
     });
     const row = getRow(verifyDb);
-    expect(row!.status).toBe("retry");
-    expect(row!.retry_message).toBe("rate limited");
-    expect(row!.retry_next).toBe(retryNext);
+    expect(row?.status).toBe("retry");
+    expect(row?.retry_message).toBe("rate limited");
+    expect(row?.retry_next).toBe(retryNext);
   });
 
   test("session.idle updates status", async () => {
@@ -286,8 +286,8 @@ describe("plugin event handler", () => {
       event: makeEvent("session.idle", { sessionID: "ses_1" }),
     });
     const row = getRow(verifyDb);
-    expect(row!.status).toBe("idle");
-    expect(row!.session_id).toBe("ses_1");
+    expect(row?.status).toBe("idle");
+    expect(row?.session_id).toBe("ses_1");
   });
 
   test("session.created sets session info and version", async () => {
@@ -303,12 +303,12 @@ describe("plugin event handler", () => {
       }),
     });
     const row = getRow(verifyDb);
-    expect(row!.session_id).toBe("ses_new");
-    expect(row!.project_id).toBe("proj_1");
-    expect(row!.directory).toBe("/home/user/project");
-    expect(row!.title).toBe("Fix login bug");
-    expect(row!.opencode_version).toBe("1.2.0");
-    expect(row!.status).toBe("idle");
+    expect(row?.session_id).toBe("ses_new");
+    expect(row?.project_id).toBe("proj_1");
+    expect(row?.directory).toBe("/home/user/project");
+    expect(row?.title).toBe("Fix login bug");
+    expect(row?.opencode_version).toBe("1.2.0");
+    expect(row?.status).toBe("idle");
   });
 
   test("session.updated updates session info", async () => {
@@ -324,9 +324,9 @@ describe("plugin event handler", () => {
       }),
     });
     const row = getRow(verifyDb);
-    expect(row!.session_id).toBe("ses_1");
-    expect(row!.title).toBe("Updated title");
-    expect(row!.opencode_version).toBe("1.3.0");
+    expect(row?.session_id).toBe("ses_1");
+    expect(row?.title).toBe("Updated title");
+    expect(row?.opencode_version).toBe("1.3.0");
   });
 
   test("session.deleted clears session info", async () => {
@@ -344,11 +344,11 @@ describe("plugin event handler", () => {
 
     await eventHandler({ event: makeEvent("session.deleted", {}) });
     const row = getRow(verifyDb);
-    expect(row!.session_id).toBeNull();
-    expect(row!.title).toBeNull();
-    expect(row!.status).toBe("idle");
-    expect(row!.todo_total).toBe(0);
-    expect(row!.todo_done).toBe(0);
+    expect(row?.session_id).toBeNull();
+    expect(row?.title).toBeNull();
+    expect(row?.status).toBe("idle");
+    expect(row?.todo_total).toBe(0);
+    expect(row?.todo_done).toBe(0);
   });
 
   test("session.error sets error status and message", async () => {
@@ -359,8 +359,8 @@ describe("plugin event handler", () => {
       }),
     });
     const row = getRow(verifyDb);
-    expect(row!.status).toBe("error");
-    expect(row!.error_message).toContain("rate limit");
+    expect(row?.status).toBe("error");
+    expect(row?.error_message).toContain("rate limit");
   });
 
   test("session.error with null error", async () => {
@@ -371,15 +371,15 @@ describe("plugin event handler", () => {
       }),
     });
     const row = getRow(verifyDb);
-    expect(row!.status).toBe("error");
-    expect(row!.error_message).toBeNull();
+    expect(row?.status).toBe("error");
+    expect(row?.error_message).toBeNull();
   });
 
   test("permission.asked sets permission_pending", async () => {
     await eventHandler({
       event: makeEvent("permission.asked", { id: "perm_1" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("permission_pending");
+    expect(getRow(verifyDb)?.status).toBe("permission_pending");
   });
 
   test("permission.replied clears to idle", async () => {
@@ -389,7 +389,7 @@ describe("plugin event handler", () => {
     await eventHandler({
       event: makeEvent("permission.replied", { requestID: "perm_1" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("idle");
+    expect(getRow(verifyDb)?.status).toBe("idle");
   });
 
   test("permission.replied falls back to question_pending", async () => {
@@ -399,19 +399,19 @@ describe("plugin event handler", () => {
     await eventHandler({
       event: makeEvent("permission.asked", { id: "perm_1" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("permission_pending");
+    expect(getRow(verifyDb)?.status).toBe("permission_pending");
 
     await eventHandler({
       event: makeEvent("permission.replied", { requestID: "perm_1" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("question_pending");
+    expect(getRow(verifyDb)?.status).toBe("question_pending");
   });
 
   test("question.asked sets question_pending when no permissions", async () => {
     await eventHandler({
       event: makeEvent("question.asked", { id: "q_1" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("question_pending");
+    expect(getRow(verifyDb)?.status).toBe("question_pending");
   });
 
   test("question.asked stays permission_pending when permissions exist", async () => {
@@ -421,7 +421,7 @@ describe("plugin event handler", () => {
     await eventHandler({
       event: makeEvent("question.asked", { id: "q_1" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("permission_pending");
+    expect(getRow(verifyDb)?.status).toBe("permission_pending");
   });
 
   test("question.replied clears to idle", async () => {
@@ -431,7 +431,7 @@ describe("plugin event handler", () => {
     await eventHandler({
       event: makeEvent("question.replied", { requestID: "q_1" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("idle");
+    expect(getRow(verifyDb)?.status).toBe("idle");
   });
 
   test("question.replied keeps permission_pending when permissions exist", async () => {
@@ -444,7 +444,7 @@ describe("plugin event handler", () => {
     await eventHandler({
       event: makeEvent("question.replied", { requestID: "q_1" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("permission_pending");
+    expect(getRow(verifyDb)?.status).toBe("permission_pending");
   });
 
   test("multiple permissions tracked independently", async () => {
@@ -454,17 +454,17 @@ describe("plugin event handler", () => {
     await eventHandler({
       event: makeEvent("permission.asked", { id: "perm_2" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("permission_pending");
+    expect(getRow(verifyDb)?.status).toBe("permission_pending");
 
     await eventHandler({
       event: makeEvent("permission.replied", { requestID: "perm_1" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("permission_pending");
+    expect(getRow(verifyDb)?.status).toBe("permission_pending");
 
     await eventHandler({
       event: makeEvent("permission.replied", { requestID: "perm_2" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("idle");
+    expect(getRow(verifyDb)?.status).toBe("idle");
   });
 
   test("todo.updated updates counts", async () => {
@@ -478,8 +478,8 @@ describe("plugin event handler", () => {
       }),
     });
     const row = getRow(verifyDb);
-    expect(row!.todo_total).toBe(3);
-    expect(row!.todo_done).toBe(1);
+    expect(row?.todo_total).toBe(3);
+    expect(row?.todo_done).toBe(1);
   });
 
   test("todo.updated with all completed", async () => {
@@ -492,8 +492,8 @@ describe("plugin event handler", () => {
       }),
     });
     const row = getRow(verifyDb);
-    expect(row!.todo_total).toBe(2);
-    expect(row!.todo_done).toBe(2);
+    expect(row?.todo_total).toBe(2);
+    expect(row?.todo_done).toBe(2);
   });
 
   test("todo.updated with empty todos", async () => {
@@ -501,8 +501,8 @@ describe("plugin event handler", () => {
       event: makeEvent("todo.updated", { todos: [] }),
     });
     const row = getRow(verifyDb);
-    expect(row!.todo_total).toBe(0);
-    expect(row!.todo_done).toBe(0);
+    expect(row?.todo_total).toBe(0);
+    expect(row?.todo_done).toBe(0);
   });
 
   test("server.instance.disposed deletes row", async () => {
@@ -565,7 +565,7 @@ describe("plugin event handler", () => {
         status: { type: "idle" },
       }),
     });
-    expect(getRow(verifyDb)!.status).toBe("idle");
+    expect(getRow(verifyDb)?.status).toBe("idle");
 
     await eventHandler({
       event: makeEvent("session.status", {
@@ -573,7 +573,7 @@ describe("plugin event handler", () => {
         status: { type: "busy" },
       }),
     });
-    expect(getRow(verifyDb)!.status).toBe("busy");
+    expect(getRow(verifyDb)?.status).toBe("busy");
 
     await eventHandler({
       event: makeEvent("session.status", {
@@ -581,7 +581,7 @@ describe("plugin event handler", () => {
         status: { type: "retry", message: "limit", next: 1000 },
       }),
     });
-    expect(getRow(verifyDb)!.status).toBe("retry");
+    expect(getRow(verifyDb)?.status).toBe("retry");
 
     await eventHandler({
       event: makeEvent("session.error", {
@@ -589,12 +589,12 @@ describe("plugin event handler", () => {
         error: { message: "crash" },
       }),
     });
-    expect(getRow(verifyDb)!.status).toBe("error");
+    expect(getRow(verifyDb)?.status).toBe("error");
 
     await eventHandler({
       event: makeEvent("session.idle", { sessionID: "ses_1" }),
     });
-    expect(getRow(verifyDb)!.status).toBe("idle");
+    expect(getRow(verifyDb)?.status).toBe("idle");
   });
 
   test("session.status idle clears retry fields", async () => {
@@ -604,7 +604,7 @@ describe("plugin event handler", () => {
         status: { type: "retry", message: "rate limit", next: 9999 },
       }),
     });
-    expect(getRow(verifyDb)!.retry_message).toBe("rate limit");
+    expect(getRow(verifyDb)?.retry_message).toBe("rate limit");
 
     await eventHandler({
       event: makeEvent("session.status", {
@@ -613,7 +613,7 @@ describe("plugin event handler", () => {
       }),
     });
     const row = getRow(verifyDb);
-    expect(row!.retry_message).toBeNull();
-    expect(row!.retry_next).toBeNull();
+    expect(row?.retry_message).toBeNull();
+    expect(row?.retry_next).toBeNull();
   });
 });
