@@ -4,21 +4,19 @@ description: Create or update a GitHub pull request from the current branch
 
 Create or update a pull request for the current branch. Generates a title from the changes and lists commits in the description. Breaking changes are highlighted.
 
+Only run commands listed in `allowed_commands`. Never run commands in `forbidden_commands` or any command that modifies files, branches, or commit history.
+
 ## Workflow
 
 ### Step 1: Validate branch state
 
-Run these commands to gather context:
-
 ```bash
 git rev-parse --abbrev-ref HEAD
-git remote show origin | grep 'HEAD branch'
 gh pr list --head "$(git rev-parse --abbrev-ref HEAD)" --json number,url,state --jq '.[] | select(.state == "OPEN")'
 ```
 
-- If on the default branch (main/master): stop with an error — PRs should not be created from the default branch.
-- Note whether an open PR already exists for this branch. If so, you will **update** it instead of creating a new one.
-- Note the default branch name (main or master) — this is the base branch.
+- If on `main`: stop with an error — PRs should not be created from the default branch.
+- Note whether an open PR already exists. If so, you will **update** it instead of creating a new one.
 
 ### Step 2: Ensure branch is pushed
 
@@ -35,13 +33,9 @@ git log @{upstream}..HEAD --oneline 2>/dev/null
 
 ### Step 3: Collect commits
 
-Get all commits on this branch that are not on the base branch:
-
 ```bash
-git log <base>..HEAD --format='%s%n%b%n---'
+git log main..HEAD --format='%s%n%b%n---'
 ```
-
-Replace `<base>` with the default branch name from Step 1.
 
 Parse each commit:
 - **Subject line**: the first line (`%s`)
@@ -86,7 +80,7 @@ Do NOT include merge commits or fixup commits in the list.
 **If no open PR exists** (from Step 1):
 
 ```bash
-gh pr create --base <base> --title "<title>" --body "$(cat <<'EOF'
+gh pr create --base main --title "<title>" --body "$(cat <<'EOF'
 <body>
 EOF
 )"

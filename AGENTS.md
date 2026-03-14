@@ -64,6 +64,7 @@ open·code-pulse/
 - **⚠ MANDATORY: Rebuild plugin after ANY change to `plugin/src/`**: Run `bun run build` immediately after editing. Open·Code loads from `plugin/dist/`, NOT `plugin/src/` — skipping this means your changes have no effect. This is not optional.
 - **⚠ MANDATORY: Run `make test` after ANY code change**. All existing tests must pass. Do not submit changes that break tests.
 - **⚠ MANDATORY: Add tests for new features**. New event types, DB queries, helper functions, and any testable logic must have corresponding unit tests. Test files are co-located: `foo.ts` → `foo.test.ts`.
+- **⚠ MANDATORY: Never run `/pr` automatically**. When you finish a set of changes, suggest the user review them and run `/pr` themselves. Do not create or update pull requests without explicit user action.
 
 ## STARTUP PERFORMANCE
 
