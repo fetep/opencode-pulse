@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Hooks, Plugin, PluginInput } from "@opencode-ai/plugin";
 import type { Event } from "@opencode-ai/sdk";
 import { parse as parseJsonc } from "jsonc-parser";
@@ -135,8 +135,9 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
     }
   }
 
-  const dbDir = join(homedir(), ".local/share/opencode-pulse");
+  const dbDir = dirname(DB_PATH);
   mkdirSync(dbDir, { recursive: true, mode: 0o700 });
+  chmodSync(dbDir, 0o700);
 
   const db = new Database(DB_PATH);
   chmodSync(DB_PATH, 0o600);
@@ -147,11 +148,12 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
 
   db.exec("PRAGMA journal_mode = WAL");
 
-  // SQLite WAL mode creates two auxiliary files that also contain DB data
+  // Force WAL/SHM file creation so we can set permissions immediately
+  db.exec("BEGIN IMMEDIATE; COMMIT");
   const shmPath = `${DB_PATH}-shm`;
   const walPath = `${DB_PATH}-wal`;
-  if (existsSync(shmPath)) chmodSync(shmPath, 0o600);
-  if (existsSync(walPath)) chmodSync(walPath, 0o600);
+  chmodSync(shmPath, 0o600);
+  chmodSync(walPath, 0o600);
 
   const versionRow = db.query("SELECT version FROM schema_version").get() as { version: number } | null;
   if (!versionRow || versionRow.version !== 3) {
