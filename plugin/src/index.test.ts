@@ -4,6 +4,9 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+const origPulseDbPath = process.env.PULSE_DB_PATH;
+const origTmuxPane = process.env.TMUX_PANE;
+
 const testDir = mkdtempSync(join(tmpdir(), "pulse-plugin-test-"));
 const testDbPath = join(testDir, "test.db");
 process.env.PULSE_DB_PATH = testDbPath;
@@ -222,6 +225,16 @@ describe("plugin event handler", () => {
 
   afterAll(() => {
     rmSync(testDir, { recursive: true, force: true });
+    if (origPulseDbPath !== undefined) {
+      process.env.PULSE_DB_PATH = origPulseDbPath;
+    } else {
+      delete process.env.PULSE_DB_PATH;
+    }
+    if (origTmuxPane !== undefined) {
+      process.env.TMUX_PANE = origTmuxPane;
+    } else {
+      delete process.env.TMUX_PANE;
+    }
   });
 
   test("creates initial row on startup", () => {
