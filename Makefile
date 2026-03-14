@@ -1,4 +1,4 @@
-.PHONY: install build typecheck update pack
+.PHONY: install build typecheck test update pack
 
 install:
 	bun install
@@ -8,6 +8,9 @@ build:
 
 typecheck:
 	bun run typecheck
+
+test:
+	bun test
 
 update:
 	bun update

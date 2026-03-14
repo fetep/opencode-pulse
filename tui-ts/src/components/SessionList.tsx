@@ -136,7 +136,7 @@ export const COLUMN_META: Record<ColumnId, ColumnMeta> = {
   },
 };
 
-const STATUS_ICONS: Record<string, string> = {
+export const STATUS_ICONS: Record<string, string> = {
   permission_pending: "\u25B2",
   question_pending: "?",
   error: "\u2717",
@@ -145,7 +145,7 @@ const STATUS_ICONS: Record<string, string> = {
   busy: "\u25E6",
 };
 
-const STATUS_LABELS: Record<string, string> = {
+export const STATUS_LABELS: Record<string, string> = {
   permission_pending: "Permission",
   question_pending: "Question",
   error: "Error",
@@ -154,7 +154,7 @@ const STATUS_LABELS: Record<string, string> = {
   busy: "Busy",
 };
 
-function statusColor(status: string): string {
+export function statusColor(status: string): string {
   const colors: Record<string, string> = {
     permission_pending: theme.warning,
     question_pending: theme.warning,
@@ -166,7 +166,7 @@ function statusColor(status: string): string {
   return colors[status] || theme.textMuted;
 }
 
-function relativeTime(timestampMs: number): string {
+export function relativeTime(timestampMs: number): string {
   const diffS = Math.floor((Date.now() - timestampMs) / 1000);
   if (diffS < 60) return `${diffS}s ago`;
   const diffM = Math.floor(diffS / 60);
@@ -177,7 +177,7 @@ function relativeTime(timestampMs: number): string {
   return `${diffD}d ago`;
 }
 
-function todoBar(done: number, total: number): string {
+export function todoBar(done: number, total: number): string {
   if (total === 0) return "\u2014";
   const barWidth = 8;
   const filled = Math.min(Math.round((done / total) * barWidth), barWidth);
@@ -185,13 +185,13 @@ function todoBar(done: number, total: number): string {
   return `[${"█".repeat(filled)}${"░".repeat(empty)}] ${done}/${total}`;
 }
 
-function truncate(str: string, maxLen: number): string {
+export function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str;
   if (maxLen <= 1) return str.slice(0, maxLen);
   return str.slice(0, maxLen - 1) + "\u2026";
 }
 
-function dirName(dir: string): string {
+export function dirName(dir: string): string {
   if (!dir) return "unknown";
   const parts = dir.split("/");
   return parts[parts.length - 1] || dir;
@@ -200,7 +200,7 @@ function dirName(dir: string): string {
 const SELECTOR_WIDTH = 2;
 const COL_GAP = 2;
 
-function fitContentWidth(col: ColumnId, sessions: Session[]): number {
+export function fitContentWidth(col: ColumnId, sessions: Session[]): number {
   const meta = COLUMN_META[col];
   let maxLen = meta.minWidth;
   for (const session of sessions) {
@@ -215,7 +215,7 @@ function fitContentWidth(col: ColumnId, sessions: Session[]): number {
   return maxLen;
 }
 
-function allocateWidths(
+export function allocateWidths(
   columns: ColumnId[],
   totalWidth: number,
   sessions: Session[],
@@ -246,7 +246,7 @@ function allocateWidths(
   return widths.map((w) => Math.max(w, 1));
 }
 
-function renderCell(
+export function renderCell(
   col: ColumnId,
   session: Session,
   width: number,
