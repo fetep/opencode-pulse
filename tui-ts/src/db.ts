@@ -9,6 +9,8 @@ let _dbPath: string = DEFAULT_DB_PATH;
 
 export function setDbPath(path: string): void {
   _dbPath = path;
+  _sessionsStmt = null;
+  _lastDataVersion = null;
   _db?.close();
   _db = null;
 }
@@ -83,6 +85,7 @@ let _sessionsStmt: ReturnType<Database["prepare"]> | null = null;
 function getDb(): Database | null {
   const dbPath = getDbPath();
   if (!existsSync(dbPath)) {
+    _db?.close();
     _db = null;
     _sessionsStmt = null;
     return null;
