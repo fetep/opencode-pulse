@@ -27,13 +27,9 @@ function truncStr(val: unknown, maxLen = MAX_FIELD_LEN): string | null {
 }
 
 function loadPluginConfig(): { debug?: boolean; dbPath?: string } {
-  for (const path of CONFIG_PATHS) {
-    if (!existsSync(path)) continue;
-    try {
-      return parseJsonc(readFileSync(path, "utf-8"));
-    } catch {
-      continue;
-    }
+  for (const configPath of CONFIG_PATHS) {
+    if (!existsSync(configPath)) continue;
+    return parseJsonc(readFileSync(configPath, "utf-8"));
   }
   return {};
 }

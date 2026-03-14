@@ -31,14 +31,10 @@ interface FileConfig {
 }
 
 function loadFileConfig(): FileConfig {
-  for (const path of CONFIG_PATHS) {
-    if (!existsSync(path)) continue;
-    try {
-      const content = readFileSync(path, "utf-8");
-      return parseJsonc(content) as FileConfig;
-    } catch {
-      continue;
-    }
+  for (const configPath of CONFIG_PATHS) {
+    if (!existsSync(configPath)) continue;
+    const content = readFileSync(configPath, "utf-8");
+    return parseJsonc(content) as FileConfig;
   }
   return {};
 }
