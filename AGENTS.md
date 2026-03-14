@@ -75,6 +75,15 @@ The TUI is often launched in a tmux popup where startup latency is directly felt
 - **Cache prepared statements.** `querySessions()` runs every 500ms. The prepared statement is cached in `_sessionsStmt` and reused across polls. Reset it when the DB connection is closed or reopened.
 - **No new blocking I/O before first render.** Any work added to the startup path (config reads, file checks, network calls) must not delay the first `refresh(true)` → render cycle. Defer or parallelize.
 
+## STARTUP PERFORMANCE
+
+The TUI is often launched in a tmux popup where startup latency is directly felt. Time-to-first-data is the critical metric — the user should see session rows as fast as possible.
+
+**Rules:**
+- **Data query before cleanup.** `cleanupStaleSessions()` opens a writable DB, checks `/proc` for each PID, and deletes dead rows. The `querySessions()` WHERE clause already filters stale sessions, so cleanup is invisible to the user. Always fetch and render data first, defer cleanup.
+- **Cache prepared statements.** `querySessions()` runs every 500ms. The prepared statement is cached in `_sessionsStmt` and reused across polls. Reset it when the DB connection is closed or reopened.
+- **No new blocking I/O before first render.** Any work added to the startup path (config reads, file checks, network calls) must not delay the first `refresh(true)` → render cycle. Defer or parallelize.
+
 ## ANTI-PATTERNS (THIS PROJECT)
 
 - **NO sub-package package.json files** — all deps in root package.json
