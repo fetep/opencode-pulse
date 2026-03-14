@@ -12,14 +12,19 @@ import {
   dbExists,
   hasDbChanged,
   closeDb,
+  getDbPath,
 } from "../db.js";
 import { isInsideTmux } from "../tmux.js";
-import { getTheme } from "../theme.js";
+import { getTheme, type Theme } from "../theme.js";
 
 const POLL_INTERVAL_MS = 500;
 const CLEANUP_INTERVAL_MS = 60_000;
 
-const theme = getTheme();
+const theme: Theme = new Proxy({} as Theme, {
+  get(_, prop: string) {
+    return getTheme()[prop as keyof Theme];
+  },
+});
 
 export type ColumnId =
   | "status"
@@ -483,8 +488,7 @@ export function SessionList({ columns, onSelect }: SessionListProps) {
         <box marginTop={1}>
           <text fg={theme.textMuted}>
             Waiting for database at{" "}
-            {process.env.PULSE_DB_PATH ||
-              "~/.local/share/opencode-pulse/status.db"}
+            {getDbPath()}
             {"\u2026"}
           </text>
         </box>

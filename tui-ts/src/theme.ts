@@ -352,7 +352,13 @@ const themes: Record<string, Theme> = {
   },
 };
 
-function readOpenCodeTheme(): string | null {
+let _themeName: string | null = null;
+
+export function setThemeName(name: string): void {
+  _themeName = name;
+}
+
+export function readOpenCodeTheme(): string | null {
   const kvPath = join(
     process.env.XDG_STATE_HOME || join(homedir(), ".local", "state"),
     "opencode",
@@ -370,6 +376,6 @@ function readOpenCodeTheme(): string | null {
 }
 
 export function getTheme(): Theme {
-  const name = process.env.PULSE_THEME || readOpenCodeTheme() || "opencode";
+  const name = _themeName || process.env.PULSE_THEME || readOpenCodeTheme() || "opencode";
   return themes[name] || themes.opencode;
 }
