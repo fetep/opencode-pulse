@@ -14,20 +14,24 @@ Open·Code session monitor. Plugin captures events → SQLite → TUI displays s
 ```
 open·code-pulse/
 ├── package.json      # Root package — plugin entry (main), TUI binaries, all deps
-├── Makefile          # Convenience targets: install, build, typecheck, update, pack
+├── Makefile          # Convenience targets: install, build, typecheck, test, update, pack
 ├── schema.sql        # Shared schema contract (source of truth, v3)
 ├── plugin/           # Open·Code plugin — event listener, writes to SQLite
-│   ├── src/index.ts  # Single-file plugin
+│   ├── src/index.ts      # Single-file plugin
+│   ├── src/index.test.ts # Plugin unit tests
 │   ├── dist/         # Built output (git-ignored)
 │   └── tsconfig.json
 ├── tui-ts/           # Terminal UI — React/OpenTUI, reads SQLite
 │   ├── src/
-│   │   ├── cli.tsx           # Entry point (shebang, bun direct execution)
-│   │   ├── db.ts             # SQLite query layer + stale/dead cleanup
-│   │   ├── tmux.ts           # Tmux attach/switch helpers
-│   │   ├── theme.ts          # 33 built-in themes, auto-detects from Open·Code
+│   │   ├── cli.tsx              # Entry point (shebang, bun direct execution)
+│   │   ├── db.ts                # SQLite query layer + stale/dead cleanup
+│   │   ├── db.test.ts           # DB layer tests
+│   │   ├── tmux.ts              # Tmux attach/switch helpers
+│   │   ├── theme.ts             # 33 built-in themes, auto-detects from Open·Code
+│   │   ├── theme.test.ts        # Theme resolution tests
 │   │   └── components/
-│   │       └── SessionList.tsx  # Main UI component
+│   │       ├── SessionList.tsx   # Main UI component
+│   │       └── helpers.test.ts  # SessionList helper function tests
 │   └── tsconfig.json
 ├── AGENTS.md
 ├── README.md
@@ -53,10 +57,12 @@ open·code-pulse/
 - **Runtime**: Bun exclusively (not Node.js). Uses `bun:sqlite` native binding
 - **Single root package.json** — no sub-package package.json files. Plugin and TUI share dependencies.
 - **No linter/formatter configured** — follow TypeScript strict mode
-- **No test framework** — manual verification only
+- **Testing**: `bun:test` framework. Tests co-located with source (`*.test.ts`)
 - **No build step for TUI** — runs `.tsx` directly via Bun shebang
 - **Plugin builds**: `bun run build` from root (or `make build`). Outputs to `plugin/dist/`
 - **⚠ MANDATORY: Rebuild plugin after ANY change to `plugin/src/`**: Run `bun run build` immediately after editing. Open·Code loads from `plugin/dist/`, NOT `plugin/src/` — skipping this means your changes have no effect. This is not optional.
+- **⚠ MANDATORY: Run `make test` after ANY code change**. All existing tests must pass. Do not submit changes that break tests.
+- **⚠ MANDATORY: Add tests for new features**. New event types, DB queries, helper functions, and any testable logic must have corresponding unit tests. Test files are co-located: `foo.ts` → `foo.test.ts`.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
@@ -101,6 +107,9 @@ bun run build                  # or: make build
 
 # Typecheck both plugin and TUI
 bun run typecheck              # or: make typecheck
+
+# Run tests (REQUIRED after any code change)
+bun test                       # or: make test
 
 # Typecheck individually (from subdirectories — tsconfig.json files exist there)
 cd plugin && bunx tsc --noEmit

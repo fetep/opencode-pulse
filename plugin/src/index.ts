@@ -16,24 +16,29 @@ function debugLog(msg: string) {
   } catch {}
 }
 
-interface CmdlineFlags {
+export interface CmdlineFlags {
   sessionId: string | null;  // from -s <id>
   continueMode: boolean;     // from -c / --continue
 }
 
-function parseCmdlineFlags(): CmdlineFlags {
-  try {
-    const args = readFileSync("/proc/self/cmdline", "utf-8").split("\0");
-    const sIdx = args.indexOf("-s");
-    const sessionId = (sIdx !== -1 && sIdx + 1 < args.length && args[sIdx + 1]) ? args[sIdx + 1] : null;
-    const continueMode = args.includes("-c") || args.includes("--continue");
-    return { sessionId, continueMode };
-  } catch {
-    return { sessionId: null, continueMode: false };
+export function parseCmdlineFlags(providedArgs?: string[]): CmdlineFlags {
+  let args: string[];
+  if (providedArgs) {
+    args = providedArgs;
+  } else {
+    try {
+      args = readFileSync("/proc/self/cmdline", "utf-8").split("\0");
+    } catch {
+      return { sessionId: null, continueMode: false };
+    }
   }
+  const sIdx = args.indexOf("-s");
+  const sessionId = (sIdx !== -1 && sIdx + 1 < args.length && args[sIdx + 1]) ? args[sIdx + 1] : null;
+  const continueMode = args.includes("-c") || args.includes("--continue");
+  return { sessionId, continueMode };
 }
 
-function summarizeEvent(event: { type: string; properties: Record<string, unknown> }): string {
+export function summarizeEvent(event: { type: string; properties: Record<string, unknown> }): string {
   const p = event.properties;
   switch (event.type) {
     case "session.diff": {
