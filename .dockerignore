@@ -1,0 +1,9 @@
+node_modules/
+.git/
+plugin/dist/
+.sisyphus/
+.opencode/
+*.log
+*.tgz
+.DS_Store
+.env

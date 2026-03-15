@@ -1,0 +1,15 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "pulse-test-write" },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "write",
+            "arguments": "{\"filePath\":\"/tmp/pulse-test-write-output.txt\",\"content\":\"pulse test write content\"}"
+          }
+        ]
+      }
+    }
+  ]
+}

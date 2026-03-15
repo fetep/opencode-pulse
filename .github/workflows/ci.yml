@@ -40,3 +40,22 @@ jobs:
           version: latest
 
       - run: biome ci .
+
+  integration-test:
+    needs: [ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run build
+
+      - run: bun install -g opencode-ai@latest
+
+      - run: INTEGRATION=1 bun test test/

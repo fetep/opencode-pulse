@@ -1,0 +1,15 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "pulse-test-todo" },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "todowrite",
+            "arguments": "{\"todos\":[{\"content\":\"Implement feature A\",\"status\":\"in_progress\",\"priority\":\"high\"},{\"content\":\"Write tests for feature A\",\"status\":\"pending\",\"priority\":\"medium\"},{\"content\":\"Update documentation\",\"status\":\"completed\",\"priority\":\"low\"}]}"
+          }
+        ]
+      }
+    }
+  ]
+}

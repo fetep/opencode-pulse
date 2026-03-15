@@ -1,0 +1,6 @@
+[test]
+# Exclude integration tests from default 'bun test' runs.
+# Integration tests are run explicitly via 'INTEGRATION=1 bun test test/' or 'make integration'.
+# Explicit path arguments to 'bun test' override this ignore pattern.
+root = "."
+testPathIgnorePatterns = ["test/"]
