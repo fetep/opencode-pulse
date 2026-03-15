@@ -18,6 +18,7 @@
     "build": "bun build plugin/src/index.ts --outdir plugin/dist --target bun --format esm",
     "typecheck": "cd plugin && bunx tsc --noEmit && cd ../tui-ts && bunx tsc --noEmit",
     "test": "bun test",
+    "test:integration": "INTEGRATION=1 bun test test/",
     "prepublishOnly": "bun run build"
   },
   "keywords": ["opencode", "plugin", "pulse", "monitor", "tui"],
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.7",
+    "@copilotkit/llmock": "^1.3.1",
     "@opencode-ai/plugin": "^1.2.25",
     "@opencode-ai/sdk": "^1.2.25",
     "@types/bun": "^1.3.10",

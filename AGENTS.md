@@ -33,6 +33,11 @@ open·code-pulse/
 │   │       ├── SessionList.tsx   # Main UI component
 │   │       └── helpers.test.ts  # SessionList helper function tests
 │   └── tsconfig.json
+├── test/             # Integration tests (require INTEGRATION=1)
+│   ├── helpers/      # Shared test utilities (spawn helpers, wait helpers)
+│   ├── fixtures/     # llmock response fixtures (*.json)
+│   ├── integration/  # Test files (*.test.ts)
+│   └── Dockerfile.integration  # Docker image for CI integration runs
 ├── biome.json        # Biome linter config (lint-only, no formatter)
 ├── AGENTS.md
 ├── README.md
@@ -52,6 +57,8 @@ open·code-pulse/
 | Theme colors/detection | `tui-ts/src/theme.ts` | Add/modify themes, auto-detect from Open·Code's kv.json |
 | Plugin config path | `plugin/src/index.ts:8` | `PULSE_DB_PATH` env var |
 | Build/publish config | `package.json` | Scripts, bin, files, dependencies |
+| Add integration test scenario | `test/fixtures/` + `test/integration/` | Add fixture JSON, add test case |
+| Integration test utilities | `test/helpers/` | Spawn helpers, wait helpers, llmock setup |
 
 ## CONVENTIONS
 
@@ -140,7 +147,39 @@ sqlite3 :memory: < schema.sql
 
 # Pack for publishing (dry run)
 make pack
+
+# Integration tests (no API keys needed — llmock intercepts requests)
+INTEGRATION=1 bun test test/    # or: make integration
+
+# Integration tests via Docker (isolated, matches CI)
+make integration-docker
 ```
+
+## INTEGRATION TESTING
+
+Integration tests spin up a real Open·Code process against a mock Anthropic API (llmock), then verify plugin + TUI behavior end-to-end. No API keys required.
+
+**Running:**
+```bash
+INTEGRATION=1 bun test test/    # run all integration tests
+make integration                # same, via Makefile
+make integration-docker         # run in Docker (matches CI)
+```
+
+**How llmock works:** Starts an HTTP proxy on `PORT+1000`. Open·Code appends `/messages` to `ANTHROPIC_BASE_URL` — point it at the proxy. Fixtures in `test/fixtures/*.json` define canned responses.
+
+**Key env vars:**
+
+| Var | Purpose |
+|-----|---------|
+| `INTEGRATION` | Set to `1` to enable integration tests (skipped otherwise) |
+| `PULSE_DB_PATH` | Override DB path (tests use a temp file per run) |
+| `ANTHROPIC_BASE_URL` | Points Open·Code at llmock proxy instead of real API |
+
+**Adding a new test scenario:**
+1. Add a fixture JSON to `test/fixtures/` with the canned API response
+2. Add a test case in the appropriate `test/integration/*.test.ts` file
+3. Use helpers from `test/helpers/` to spawn Open·Code and wait for DB state
 
 ## NOTES
 

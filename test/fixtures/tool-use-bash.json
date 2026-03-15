@@ -1,0 +1,15 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "pulse-test-bash" },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "bash",
+            "arguments": "{\"command\":\"echo pulse-test-output\",\"description\":\"Print test output\"}"
+          }
+        ]
+      }
+    }
+  ]
+}

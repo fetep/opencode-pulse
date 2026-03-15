@@ -1,0 +1,15 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "pulse-test-multistep" },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "bash",
+            "arguments": "{\"command\":\"echo pulse-multistep-step1\",\"description\":\"First step of multi-step test\"}"
+          }
+        ]
+      }
+    }
+  ]
+}
