@@ -464,6 +464,18 @@ describe("renderCell", () => {
     expect(cell.text).not.toContain("+");
   });
 
+  test("agents cell shows count when > 0", () => {
+    const session = makeSession({ subagent_count: 5 });
+    const cell = renderCell("agents", session, 10);
+    expect(cell.text).toContain("5");
+  });
+
+  test("agents cell shows em dash when 0", () => {
+    const session = makeSession({ subagent_count: 0 });
+    const cell = renderCell("agents", session, 10);
+    expect(cell.text).toContain("\u2014");
+  });
+
   test("age cell uses session_started_at", () => {
     const session = makeSession({ session_started_at: Date.now() - 120_000 });
     const cell = renderCell("age", session, 20);
