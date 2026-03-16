@@ -85,7 +85,6 @@ The TUI is often launched in a tmux popup where startup latency is directly felt
 ## ANTI-PATTERNS (THIS PROJECT)
 
 - **NO sub-package package.json files** — all deps in root package.json
-- **NO config files** — hardcode DB path, poll interval, stale threshold
 - **NO abstractions in plugin** — single file, no class hierarchies, no interfaces for single implementations
 - **NO cost/token columns yet** — see UNTRACKED METADATA for future schema candidates
 - **NO tabs/modals/split panes** — list view only in TUI
