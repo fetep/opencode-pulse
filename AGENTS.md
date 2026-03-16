@@ -202,7 +202,7 @@ When capturing new data from Open·Code events, follow the full pipeline — eve
 ### Checklist
 
 1. **Schema** — Add column to `schema.sql`, bump `schema_version`
-2. **Plugin migration** — Add `PRAGMA table_info` check + `ALTER TABLE` in `plugin/src/index.ts` (see existing `subagent_count` pattern)
+2. **Plugin migration** — Add entry to `MIGRATIONS` array in `plugin/src/index.ts` with the new version number and ALTER TABLE SQL. Bump `LATEST_VERSION` to match. The migration system runs pending migrations in order on plugin startup — never deletes the database.
 3. **Plugin extraction** — Add field extraction in the event handler switch cases
 4. **Plugin types** — Add field to `SessionRow` interface in `plugin/src/index.ts`
 5. **Plugin upsert** — Add column to `ALLOWED_UPDATE_COLUMNS`, `upsertProcess` defaults, and INSERT column list

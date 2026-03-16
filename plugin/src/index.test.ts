@@ -12,7 +12,7 @@ const testDbPath = join(testDir, "test.db");
 process.env.PULSE_DB_PATH = testDbPath;
 delete process.env.TMUX_PANE;
 
-const { default: createPlugin, summarizeEvent, parseCmdlineFlags } = await import("./index.ts");
+const { default: createPlugin, summarizeEvent, parseCmdlineFlags, migrateDb, getSchemaVersion, LATEST_VERSION } = await import("./index.ts");
 
 interface SessionRow {
   pid: number;
@@ -815,5 +815,223 @@ describe("plugin event handler", () => {
     const row = getRow(verifyDb);
     expect(row?.retry_message).toBeNull();
     expect(row?.retry_next).toBeNull();
+  });
+});
+
+describe("migrateDb", () => {
+  const migrationDir = mkdtempSync(join(tmpdir(), "pulse-migrate-test-"));
+  let migrationDbPath: string;
+  let counter = 0;
+
+  function freshDbPath(): string {
+    counter++;
+    return join(migrationDir, `migrate-${counter}.db`);
+  }
+
+  afterAll(() => {
+    rmSync(migrationDir, { recursive: true, force: true });
+  });
+
+  test("current version database is untouched", () => {
+    migrationDbPath = freshDbPath();
+    const db = new Database(migrationDbPath);
+    migrateDb(db);
+    const beforeVersion = getSchemaVersion(db);
+    expect(beforeVersion).toBe(LATEST_VERSION);
+
+    migrateDb(db);
+    const afterVersion = getSchemaVersion(db);
+    expect(afterVersion).toBe(LATEST_VERSION);
+
+    db.close();
+  });
+
+  test("newer version database is not downgraded", () => {
+    migrationDbPath = freshDbPath();
+    const db = new Database(migrationDbPath);
+    migrateDb(db);
+
+    db.exec(`UPDATE schema_version SET version = ${LATEST_VERSION + 5} WHERE id = 1`);
+    expect(getSchemaVersion(db)).toBe(LATEST_VERSION + 5);
+
+    migrateDb(db);
+    expect(getSchemaVersion(db)).toBe(LATEST_VERSION + 5);
+
+    db.close();
+  });
+
+  test("legacy database without schema_version gets upgraded", () => {
+    migrationDbPath = freshDbPath();
+    const db = new Database(migrationDbPath);
+
+    db.exec(`
+      CREATE TABLE sessions (
+        pid INTEGER PRIMARY KEY,
+        session_id TEXT,
+        project_id TEXT,
+        directory TEXT,
+        title TEXT,
+        status TEXT NOT NULL DEFAULT 'idle',
+        retry_message TEXT,
+        retry_next INTEGER,
+        error_message TEXT,
+        tmux_pane TEXT,
+        tmux_target TEXT,
+        opencode_version TEXT,
+        todo_total INTEGER NOT NULL DEFAULT 0,
+        todo_done INTEGER NOT NULL DEFAULT 0,
+        heartbeat_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `);
+
+    migrateDb(db);
+
+    expect(getSchemaVersion(db)).toBe(LATEST_VERSION);
+
+    const cols = db.query("PRAGMA table_info(sessions)").all() as { name: string }[];
+    const colNames = cols.map(c => c.name);
+    expect(colNames).toContain("subagent_count");
+    expect(colNames).toContain("session_started_at");
+
+    db.close();
+  });
+
+  test("getSchemaVersion returns 0 for empty database", () => {
+    migrationDbPath = freshDbPath();
+    const db = new Database(migrationDbPath);
+    expect(getSchemaVersion(db)).toBe(0);
+    db.close();
+  });
+
+  function createOldSchemaVersionTable(db: Database, version: number): void {
+    db.exec("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)");
+    db.exec(`INSERT INTO schema_version (version) VALUES (${version})`);
+  }
+
+  test("v2 database migrates to v4 preserving data and upgrading schema_version table", () => {
+    migrationDbPath = freshDbPath();
+    const db = new Database(migrationDbPath);
+
+    createOldSchemaVersionTable(db, 2);
+    db.exec(`
+      CREATE TABLE sessions (
+        pid INTEGER PRIMARY KEY,
+        session_id TEXT,
+        project_id TEXT,
+        directory TEXT,
+        title TEXT,
+        status TEXT NOT NULL DEFAULT 'idle',
+        retry_message TEXT,
+        retry_next INTEGER,
+        error_message TEXT,
+        tmux_pane TEXT,
+        tmux_target TEXT,
+        todo_total INTEGER NOT NULL DEFAULT 0,
+        todo_done INTEGER NOT NULL DEFAULT 0,
+        heartbeat_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `);
+
+    const now = Date.now();
+    db.exec(
+      `INSERT INTO sessions (pid, session_id, title, status, heartbeat_at, created_at, updated_at)
+       VALUES (88888, 'ses_v2', 'V2 Session', 'idle', ${now}, ${now}, ${now})`
+    );
+
+    migrateDb(db);
+    expect(getSchemaVersion(db)).toBe(LATEST_VERSION);
+
+    const cols = db.query("PRAGMA table_info(sessions)").all() as { name: string }[];
+    const colNames = cols.map(c => c.name);
+    expect(colNames).toContain("opencode_version");
+    expect(colNames).toContain("subagent_count");
+    expect(colNames).toContain("session_started_at");
+
+    const row = db.query("SELECT * FROM sessions WHERE pid = 88888").get() as Record<string, unknown>;
+    expect(row.session_id).toBe("ses_v2");
+    expect(row.title).toBe("V2 Session");
+    expect(row.opencode_version).toBeNull();
+    expect(row.subagent_count).toBe(0);
+    expect(row.session_started_at).toBeNull();
+
+    const svCols = db.query("PRAGMA table_info(schema_version)").all() as { name: string }[];
+    const svColNames = svCols.map(c => c.name);
+    expect(svColNames).toContain("id");
+    expect(svColNames).toContain("version");
+
+    db.close();
+  });
+
+  test("getSchemaVersion reads old format schema_version table", () => {
+    migrationDbPath = freshDbPath();
+    const db = new Database(migrationDbPath);
+
+    createOldSchemaVersionTable(db, 3);
+    expect(getSchemaVersion(db)).toBe(3);
+
+    db.close();
+  });
+
+  test("v1 migrated through all versions matches fresh schema.sql", () => {
+    const migratedPath = freshDbPath();
+    const migratedDb = new Database(migratedPath);
+    createOldSchemaVersionTable(migratedDb, 1);
+    migratedDb.exec(`
+      CREATE TABLE sessions (
+        session_id TEXT PRIMARY KEY,
+        project_id TEXT,
+        directory TEXT,
+        title TEXT,
+        status TEXT NOT NULL DEFAULT 'idle',
+        retry_message TEXT,
+        retry_next INTEGER,
+        error_message TEXT,
+        tmux_pane TEXT,
+        tmux_target TEXT,
+        todo_total INTEGER NOT NULL DEFAULT 0,
+        todo_done INTEGER NOT NULL DEFAULT 0,
+        heartbeat_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+      CREATE INDEX IF NOT EXISTS idx_sessions_heartbeat ON sessions(heartbeat_at);
+    `);
+    migrateDb(migratedDb);
+
+    const freshPath = freshDbPath();
+    const freshDb = new Database(freshPath);
+    migrateDb(freshDb);
+
+    type ColInfo = { name: string; type: string; notnull: number; dflt_value: string | null; pk: number };
+    const migratedCols = migratedDb.query("PRAGMA table_info(sessions)").all() as ColInfo[];
+    const freshCols = freshDb.query("PRAGMA table_info(sessions)").all() as ColInfo[];
+
+    const normalize = (cols: ColInfo[]) =>
+      cols.map(({ name, type, notnull, dflt_value, pk }) => ({ name, type, notnull, dflt_value, pk }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+    expect(normalize(migratedCols)).toEqual(normalize(freshCols));
+
+    const migratedIndexes = migratedDb.query(
+      "SELECT name, tbl_name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    ).all();
+    const freshIndexes = freshDb.query(
+      "SELECT name, tbl_name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    ).all();
+    expect(migratedIndexes).toEqual(freshIndexes);
+
+    const migratedSV = migratedDb.query("PRAGMA table_info(schema_version)").all() as ColInfo[];
+    const freshSV = freshDb.query("PRAGMA table_info(schema_version)").all() as ColInfo[];
+    expect(normalize(migratedSV)).toEqual(normalize(freshSV));
+
+    expect(getSchemaVersion(migratedDb)).toBe(getSchemaVersion(freshDb));
+
+    migratedDb.close();
+    freshDb.close();
   });
 });
