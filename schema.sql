@@ -1,9 +1,11 @@
 -- Schema version 4: add subagent tracking and session age
 CREATE TABLE IF NOT EXISTS schema_version (
-    version INTEGER PRIMARY KEY
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    version INTEGER NOT NULL
 );
 
-INSERT OR IGNORE INTO schema_version (version) VALUES (4);
+INSERT INTO schema_version (id, version) VALUES (1, 4)
+    ON CONFLICT(id) DO UPDATE SET version = excluded.version;
 
 CREATE TABLE IF NOT EXISTS sessions (
     pid                INTEGER PRIMARY KEY,
