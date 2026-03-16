@@ -50,6 +50,141 @@ function debugLog(msg: string) {
   } catch {}
 }
 
+export const LATEST_VERSION = 4;
+
+// Ordered migrations. Each entry upgrades from (version-1) to version.
+// Future migrations:
+//   { version: 5, sql: "ALTER TABLE sessions ADD COLUMN cost REAL DEFAULT 0" },
+export const MIGRATIONS: { version: number; sql: string }[] = [
+  // v1→v2: primary key changed from session_id TEXT to pid INTEGER.
+  // No data migration possible — sessions are ephemeral (running processes).
+  {
+    version: 2,
+    sql: `
+      DROP TABLE IF EXISTS sessions;
+      CREATE TABLE sessions (
+        pid INTEGER PRIMARY KEY,
+        session_id TEXT,
+        project_id TEXT,
+        directory TEXT,
+        title TEXT,
+        status TEXT NOT NULL DEFAULT 'idle',
+        retry_message TEXT,
+        retry_next INTEGER,
+        error_message TEXT,
+        tmux_pane TEXT,
+        tmux_target TEXT,
+        todo_total INTEGER NOT NULL DEFAULT 0,
+        todo_done INTEGER NOT NULL DEFAULT 0,
+        heartbeat_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+      CREATE INDEX IF NOT EXISTS idx_sessions_heartbeat ON sessions(heartbeat_at);
+    `,
+  },
+  {
+    version: 3,
+    sql: "ALTER TABLE sessions ADD COLUMN opencode_version TEXT",
+  },
+  {
+    version: 4,
+    sql: `
+      ALTER TABLE sessions ADD COLUMN subagent_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE sessions ADD COLUMN session_started_at INTEGER;
+    `,
+  },
+];
+
+export function getSchemaVersion(db: Database): number {
+  try {
+    const tables = db.query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
+    ).all();
+    if (tables.length === 0) return 0;
+    // MAX(version) works for both old format (version as PK) and new format (id + version)
+    const row = db.query("SELECT MAX(version) as version FROM schema_version").get() as { version: number } | null;
+    return row?.version ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Ensure all v4 columns exist (for legacy DBs without version tracking)
+function ensureColumns(db: Database): void {
+  const tableInfo = db.query("PRAGMA table_info(sessions)").all() as { name: string }[];
+  const columns = new Set(tableInfo.map(c => c.name));
+  if (!columns.has("opencode_version")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN opencode_version TEXT");
+  }
+  if (!columns.has("subagent_count")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN subagent_count INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!columns.has("session_started_at")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN session_started_at INTEGER");
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_heartbeat ON sessions(heartbeat_at)");
+}
+
+// v1-v3 used `version INTEGER PRIMARY KEY`; v4+ uses `id INTEGER PRIMARY KEY, version INTEGER`
+function upgradeSchemaVersionTable(db: Database, version: number): void {
+  const cols = db.query("PRAGMA table_info(schema_version)").all() as { name: string }[];
+  const colNames = new Set(cols.map(c => c.name));
+  if (!colNames.has("id")) {
+    db.exec("DROP TABLE schema_version");
+    db.exec(`
+      CREATE TABLE schema_version (
+        id INTEGER PRIMARY KEY CHECK(id = 1),
+        version INTEGER NOT NULL
+      );
+    `);
+  }
+  db.exec(
+    `INSERT INTO schema_version (id, version) VALUES (1, ${version})
+       ON CONFLICT(id) DO UPDATE SET version = excluded.version`
+  );
+}
+
+export function migrateDb(db: Database): void {
+  const current = getSchemaVersion(db);
+  if (current >= LATEST_VERSION) return;
+
+  if (current === 0) {
+    const tables = db.query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'"
+    ).all();
+    if (tables.length === 0) {
+      const schema = readFileSync(SCHEMA_PATH, "utf-8");
+      db.exec(schema);
+      debugLog(`migrate: fresh database, created at v${LATEST_VERSION}`);
+      return;
+    }
+    // Legacy DB: sessions table exists but no version tracking.
+    // Bring columns up to date and stamp the version.
+    ensureColumns(db);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_version (
+        id INTEGER PRIMARY KEY CHECK(id = 1),
+        version INTEGER NOT NULL
+      );
+    `);
+    upgradeSchemaVersionTable(db, LATEST_VERSION);
+    debugLog(`migrate: legacy database upgraded to v${LATEST_VERSION}`);
+    return;
+  }
+
+  for (const m of MIGRATIONS) {
+    if (m.version > current && m.version <= LATEST_VERSION) {
+      db.exec(m.sql);
+      debugLog(`migrate: applied v${m.version}`);
+    }
+  }
+  upgradeSchemaVersionTable(db, LATEST_VERSION);
+  debugLog(`migrate: upgraded from v${current} to v${LATEST_VERSION}`);
+}
+
 export interface CmdlineFlags {
   sessionId: string | null;  // from -s <id>
   continueMode: boolean;     // from -c / --continue
@@ -150,26 +285,18 @@ const plugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   chmodSync(DB_PATH, 0o600);
   if (existsSync(DEBUG_LOG)) chmodSync(DEBUG_LOG, 0o600);
 
-  const schema = readFileSync(SCHEMA_PATH, "utf-8");
-  db.exec(schema);
+  migrateDb(db);
 
   db.exec("PRAGMA journal_mode = WAL");
 
-  // Force WAL/SHM file creation so we can set permissions immediately
-  db.exec("BEGIN IMMEDIATE; COMMIT");
+  // Force WAL/SHM file creation so we can set permissions immediately.
+  // migrateDb may skip writes on an up-to-date DB, so we need a real
+  // write to guarantee WAL frames are created.
+  db.exec(`INSERT INTO schema_version (id, version) VALUES (1, ${LATEST_VERSION}) ON CONFLICT(id) DO UPDATE SET version = excluded.version`);
   const shmPath = `${DB_PATH}-shm`;
   const walPath = `${DB_PATH}-wal`;
   chmodSync(shmPath, 0o600);
   chmodSync(walPath, 0o600);
-
-  const tableInfo = db.query("PRAGMA table_info(sessions)").all() as { name: string }[];
-  const columnNames = new Set(tableInfo.map(c => c.name));
-  if (!columnNames.has("subagent_count")) {
-    db.exec("ALTER TABLE sessions ADD COLUMN subagent_count INTEGER NOT NULL DEFAULT 0");
-  }
-  if (!columnNames.has("session_started_at")) {
-    db.exec("ALTER TABLE sessions ADD COLUMN session_started_at INTEGER");
-  }
 
   const pendingPermissions = new Set<string>();
   const pendingQuestions = new Set<string>();

@@ -15,7 +15,7 @@
     "schema.sql"
   ],
   "scripts": {
-    "build": "bun build plugin/src/index.ts --outdir plugin/dist --target bun --format esm",
+    "build": "bun build plugin/src/entry.ts --outfile plugin/dist/index.js --target bun --format esm",
     "typecheck": "cd plugin && bunx tsc --noEmit && cd ../tui-ts && bunx tsc --noEmit",
     "test": "bun test",
     "test:integration": "INTEGRATION=1 bun test test/",

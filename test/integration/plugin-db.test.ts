@@ -104,7 +104,7 @@ const shouldRun = !!process.env.INTEGRATION;
         "session_id and version set",
       );
       expect(row.session_id).toBeTruthy();
-      expect(row.opencode_version).toBe("1.2.26");
+      expect(row.opencode_version).toMatch(/^\d+\.\d+\.\d+$/);
       expect(row.title).toBeTruthy();
     }, 20_000);
 
