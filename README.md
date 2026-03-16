@@ -133,6 +133,7 @@ All keys are optional — only set what you want to override. Plain `pulse.json`
 | `project` | Project directory name                         |
 | `title`   | Session title or task description               |
 | `todo`    | Todo progress bar with done/total count        |
+| `agents`  | Active subagent count                          |
 | `updated` | Time since last update                         |
 | `age`     | Time since session was created                 |
 | `pid`     | OpenCode process ID                            |

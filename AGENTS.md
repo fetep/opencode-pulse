@@ -15,7 +15,7 @@ Open·Code session monitor. Plugin captures events → SQLite → TUI displays s
 open·code-pulse/
 ├── package.json      # Root package — plugin entry (main), TUI binaries, all deps
 ├── Makefile          # Convenience targets: install, build, typecheck, test, update, pack
-├── schema.sql        # Shared schema contract (source of truth, v3)
+├── schema.sql        # Shared schema contract (source of truth, v4)
 ├── plugin/           # Open·Code plugin — event listener, writes to SQLite
 │   ├── src/index.ts      # Single-file plugin
 │   ├── src/index.test.ts # Plugin unit tests
@@ -87,7 +87,7 @@ The TUI is often launched in a tmux popup where startup latency is directly felt
 - **NO sub-package package.json files** — all deps in root package.json
 - **NO config files** — hardcode DB path, poll interval, stale threshold
 - **NO abstractions in plugin** — single file, no class hierarchies, no interfaces for single implementations
-- **NO cost/token columns** — reserved for future schema migration
+- **NO cost/token columns yet** — see UNTRACKED METADATA for future schema candidates
 - **NO tabs/modals/split panes** — list view only in TUI
 - **NO sending messages to Open·Code** — TUI is read + navigate only
 - **NO zellij/screen** — tmux only
@@ -195,3 +195,78 @@ make integration-docker         # run in Docker (matches CI)
 - TUI poll interval: 500ms (uses `PRAGMA data_version` to skip unchanged data)
 - WAL mode required for concurrent plugin writes + TUI reads
 - **Debugging events**: The plugin writes all received events to `~/.local/share/open·code-pulse/debug.log` with timestamps. When unsure what events Open·Code generates or what their payloads look like, read this file. If it's empty or stale, ask the user to perform actions in Open·Code (start a session, trigger a permission prompt, create todos, etc.) to generate fresh events you can inspect.
+
+## ADDING NEW METADATA
+
+When capturing new data from Open·Code events, follow the full pipeline — every new schema column gets a corresponding TUI column option.
+
+### Checklist
+
+1. **Schema** — Add column to `schema.sql`, bump `schema_version`
+2. **Plugin migration** — Add `PRAGMA table_info` check + `ALTER TABLE` in `plugin/src/index.ts` (see existing `subagent_count` pattern)
+3. **Plugin extraction** — Add field extraction in the event handler switch cases
+4. **Plugin types** — Add field to `SessionRow` interface in `plugin/src/index.ts`
+5. **Plugin upsert** — Add column to `ALLOWED_UPDATE_COLUMNS`, `upsertProcess` defaults, and INSERT column list
+6. **TUI types** — Add field to `Session` interface in `tui-ts/src/db.ts`
+7. **TUI query** — Add column to `SESSIONS_QUERY` in `tui-ts/src/db.ts` (use COALESCE for nullable fields)
+8. **TUI column** — Add `ColumnId` entry, `ALL_COLUMNS`, `COLUMN_META`, and `renderCell` case in `SessionList.tsx`
+9. **Tests** — Add `renderCell` tests in `helpers.test.ts`, add field to `makeSession()` helper
+10. **README** — Add column to the columns table in `README.md`
+11. **Rebuild** — `bun run build` (plugin changed)
+
+Steps 8–10 are **mandatory** — every piece of tracked metadata must be displayable as a TUI column, even if it's not in `DEFAULT_COLUMNS`. Users select columns via `--columns` / config file.
+
+### Where events flow
+
+```
+Open·Code emits event → plugin/src/index.ts event handler
+  → upsertProcess() writes to SQLite
+  → tui-ts/src/db.ts querySessions() reads from SQLite
+  → tui-ts/src/components/SessionList.tsx renders columns
+```
+
+## UNTRACKED METADATA
+
+Open·Code SDK exposes 31 event types (`@opencode-ai/sdk` `Event` union in `node_modules/@opencode-ai/sdk/dist/gen/types.gen.d.ts`). The plugin handles 12. Below are fields available from events we receive but don't persist to SQLite.
+
+### High value — from `message.updated` (AssistantMessage)
+
+The plugin currently ignores `message.updated` events entirely. These carry:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `cost` | number | Cumulative message cost |
+| `tokens.input` | number | Input token count |
+| `tokens.output` | number | Output token count |
+| `tokens.reasoning` | number | Reasoning tokens (thinking models) |
+| `tokens.cache.read` | number | Cache read tokens |
+| `tokens.cache.write` | number | Cache write tokens |
+| `modelID` | string | Model being used (e.g. `claude-sonnet-4-20250514`) |
+| `providerID` | string | Provider (e.g. `anthropic`, `openai`) |
+| `mode` | string | Agent mode |
+| `finish` | string | Finish reason |
+
+To track these, the plugin would need to handle `message.updated`, filter for `role === "assistant"`, accumulate cost/tokens across messages, and store the latest model/provider.
+
+### Medium value — from `session.created` / `session.updated` (Session)
+
+Already partially handled. These additional fields are available but not stored:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `summary.additions` | number | Total lines added |
+| `summary.deletions` | number | Total lines deleted |
+| `summary.files` | number | Number of files changed |
+| `share.url` | string | Share link if session is shared |
+| `time.compacting` | number | Timestamp when compaction started |
+
+### Lower value — from events we don't handle
+
+| Event | Key fields | Notes |
+|-------|-----------|-------|
+| `session.diff` | `diff[].file`, `additions`, `deletions` | Per-file change stats |
+| `message.part.updated` | `part.tool`, `part.state.status` | Tool execution tracking |
+| `session.compacted` | `sessionID` | Session was compacted |
+| `pty.created/exited` | `command`, `exitCode` | Terminal process tracking |
+| `command.executed` | `name`, `arguments` | Slash command tracking |
+| `vcs.branch.updated` | `branch` | Git branch changes |

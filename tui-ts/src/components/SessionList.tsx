@@ -34,6 +34,7 @@ export type ColumnId =
   | "project"
   | "title"
   | "todo"
+  | "agents"
   | "updated"
   | "age"
   | "pid"
@@ -55,6 +56,7 @@ export const ALL_COLUMNS: ColumnId[] = [
   "project",
   "title",
   "todo",
+  "agents",
   "updated",
   "age",
   "pid",
@@ -98,6 +100,12 @@ export const COLUMN_META: Record<ColumnId, ColumnMeta> = {
     minWidth: 16,
     flex: false,
     description: "Todo progress bar with done/total count",
+  },
+  agents: {
+    header: "AGENTS",
+    minWidth: 7,
+    flex: false,
+    description: "Active subagent count",
   },
   updated: {
     header: "UPDATED",
@@ -296,6 +304,13 @@ export function renderCell(
         ).padEnd(width),
         color: session.todo_total > 0 ? theme.warning : theme.textMuted,
       };
+    case "agents": {
+      const count = session.subagent_count;
+      return {
+        text: (count > 0 ? String(count) : "\u2014").padEnd(width),
+        color: count > 0 ? theme.accent : theme.textMuted,
+      };
+    }
     case "updated":
       return {
         text: truncate(relativeTime(session.updated_at), width).padEnd(width),
