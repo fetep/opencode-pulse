@@ -41,6 +41,14 @@ jobs:
 
       - run: biome ci .
 
+      - name: Verify npm pack
+        run: |
+          npm pack --dry-run 2>&1 | tee /tmp/pack.out
+          if grep -q 'npm warn' /tmp/pack.out; then
+            echo "::error::npm pack produced warnings"
+            exit 1
+          fi
+
   integration-test:
     needs: [lint-and-test]
     runs-on: ubuntu-latest

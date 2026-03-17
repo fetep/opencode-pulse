@@ -5,10 +5,11 @@
   "type": "module",
   "main": "./plugin/dist/index.js",
   "bin": {
-    "pulse": "./tui-ts/src/cli.tsx",
-    "opencode-pulse": "./tui-ts/src/cli.tsx"
+    "pulse": "./bin/pulse.js",
+    "opencode-pulse": "./bin/pulse.js"
   },
   "files": [
+    "bin",
     "plugin/dist",
     "tui-ts/src",
     "tui-ts/tsconfig.json",
