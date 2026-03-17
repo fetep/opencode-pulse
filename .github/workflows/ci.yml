@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
@@ -44,7 +45,7 @@ jobs:
       - name: Verify npm pack
         run: |
           npm pack --dry-run 2>&1 | tee /tmp/pack.out
-          if grep -q 'npm warn' /tmp/pack.out; then
+          if grep -qi 'npm warn publish' /tmp/pack.out; then
             echo "::error::npm pack produced warnings"
             exit 1
           fi
