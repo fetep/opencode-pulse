@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -57,16 +59,49 @@ jobs:
       - name: Bump version
         run: npm version ${{ inputs.bump }} --no-git-tag-version
 
-      - name: Publish to npm
-        run: npm publish --provenance
+      - name: Generate changelog
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          DATE=$(date -u +%Y-%m-%d)
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
-      - name: Commit and tag
+          {
+            echo "## v${VERSION} (${DATE})"
+            echo ""
+            if [ -n "$PREV_TAG" ]; then
+              git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" --no-merges
+            else
+              git log --pretty=format:"- %s" --no-merges
+            fi
+            echo ""
+          } > /tmp/release-notes.md
+
+          if [ -f CHANGELOG.md ]; then
+            { cat /tmp/release-notes.md; echo ""; cat CHANGELOG.md; } > CHANGELOG.md.tmp
+            mv CHANGELOG.md.tmp CHANGELOG.md
+          else
+            { echo "# Changelog"; echo ""; cat /tmp/release-notes.md; } > CHANGELOG.md
+          fi
+
+      - name: Commit, tag, and push
         run: |
           VERSION=$(node -p "require('./package.json').version")
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json
+          git add package.json CHANGELOG.md
           git commit -m "chore: release v${VERSION}"
           git tag "v${VERSION}"
           git push
           git push --tags
+
+      - name: Publish to npm
+        run: npm publish --provenance
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --notes-file /tmp/release-notes.md
