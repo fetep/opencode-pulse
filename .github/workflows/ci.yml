@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
+  lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -42,7 +42,7 @@ jobs:
       - run: biome ci .
 
   integration-test:
-    needs: [ci]
+    needs: [lint-and-test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
