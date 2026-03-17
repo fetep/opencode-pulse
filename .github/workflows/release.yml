@@ -17,7 +17,13 @@ permissions:
   id-token: write
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   release:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -36,25 +42,6 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - run: bun run build
-
-      - run: bun run typecheck
-
-      - run: bun test
-
-      - name: Lint
-        uses: biomejs/setup-biome@v2
-        with:
-          version: latest
-
-      - run: biome ci .
-
-      - name: Verify npm pack
-        run: |
-          npm pack --dry-run 2>&1 | tee /tmp/pack.out
-          if grep -q 'npm warn' /tmp/pack.out; then
-            echo "::error::npm pack produced warnings"
-            exit 1
-          fi
 
       - name: Bump version
         run: npm version ${{ inputs.bump }} --no-git-tag-version

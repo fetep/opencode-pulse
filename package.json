@@ -5,8 +5,8 @@
   "type": "module",
   "main": "./plugin/dist/index.js",
   "bin": {
-    "pulse": "./bin/pulse.js",
-    "opencode-pulse": "./bin/pulse.js"
+    "pulse": "bin/pulse.js",
+    "opencode-pulse": "bin/pulse.js"
   },
   "files": [
     "bin",
@@ -22,7 +22,13 @@
     "test:integration": "INTEGRATION=1 bun test test/",
     "prepublishOnly": "bun run build"
   },
-  "keywords": ["opencode", "plugin", "pulse", "monitor", "tui"],
+  "keywords": [
+    "opencode",
+    "plugin",
+    "pulse",
+    "monitor",
+    "tui"
+  ],
   "license": "MIT",
   "author": "Pete Fritchman",
   "repository": {
