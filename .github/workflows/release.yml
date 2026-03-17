@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run build
+
+      - run: bun run typecheck
+
+      - run: bun test
+
+      - name: Lint
+        uses: biomejs/setup-biome@v2
+        with:
+          version: latest
+
+      - run: biome ci .
+
+      - name: Verify npm pack
+        run: |
+          npm pack --dry-run 2>&1 | tee /tmp/pack.out
+          if grep -q 'npm warn' /tmp/pack.out; then
+            echo "::error::npm pack produced warnings"
+            exit 1
+          fi
+
+      - name: Bump version
+        run: npm version ${{ inputs.bump }} --no-git-tag-version
+
+      - name: Publish to npm
+        run: npm publish --provenance
+
+      - name: Commit and tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: release v${VERSION}"
+          git tag "v${VERSION}"
+          git push
+          git push --tags
