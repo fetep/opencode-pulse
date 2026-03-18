@@ -1,6 +1,6 @@
 {
   "name": "opencode-pulse",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Monitor your OpenCode sessions — plugin + TUI sorted by urgency",
   "type": "module",
   "main": "./plugin/dist/index.js",
