@@ -3,7 +3,6 @@
 - ci: replace npm pack check with npm pkg fix idempotency check
 - chore: add fetch + rebase step to /pr command
 - fix(ci): narrow npm pack check to publish warnings only
-- fix(ci): narrow npm pack check to publish warnings only
 - docs: add retroactive changelog for v0.1.0
 - ci: add release workflow with npm trusted publishing and changelog generation
 - ci: add npm pack validation and OIDC release workflow
@@ -43,8 +42,6 @@
 - chore: could be opencode.jsonc
 - chore: recommend opencode-pulse@latest
 - docs: add tmux popup keybind tip to README
-
-# Changelog
 
 ## v0.1.0 (2026-03-13)
 
