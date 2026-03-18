@@ -42,13 +42,13 @@ jobs:
 
       - run: biome ci .
 
-      - name: Verify npm pack
+      - name: Verify package.json
         run: |
-          npm pack --dry-run 2>&1 | tee /tmp/pack.out
-          if grep -qi 'npm warn publish' /tmp/pack.out; then
-            echo "::error::npm pack produced warnings"
+          npm pkg fix
+          git diff --exit-code package.json || {
+            echo "::error::npm pkg fix modified package.json — run 'npm pkg fix' locally and commit"
             exit 1
-          fi
+          }
 
   integration-test:
     needs: [lint-and-test]
