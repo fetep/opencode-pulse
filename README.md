@@ -30,12 +30,16 @@ Run these checks (don't ask the user, just detect):
 
 ```bash
 command -v bun >/dev/null 2>&1 && echo "bun=$(bun --version)" || echo "bun=missing"
+command -v brew >/dev/null 2>&1 && echo "brew=found" || echo "brew=missing"
 command -v opencode >/dev/null 2>&1 && echo "opencode=found" || echo "opencode=missing"
 command -v tmux >/dev/null 2>&1 && echo "tmux=found" || echo "tmux=missing"
 command -v pulse >/dev/null 2>&1 && echo "pulse=already-installed" || echo "pulse=not-installed"
 ```
 
-- bun missing → Tell the user to install Bun first (https://bun.sh) and stop.
+- bun missing + brew found → Ask: "Bun is required but not installed. Install it
+  with `brew install oven-sh/bun/bun`?" If yes, run it and continue. If no, stop.
+- bun missing + brew missing → Tell the user to install Bun first
+  (https://bun.sh) and stop.
 - opencode missing → Warn that OpenCode is needed, but proceed with installation.
 
 ### Step 2: Add the plugin to OpenCode config
