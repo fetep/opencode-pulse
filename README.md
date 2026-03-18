@@ -57,8 +57,18 @@ cat ~/.config/opencode/opencode.json 2>/dev/null || cat ~/.config/opencode/openc
 bun add -g opencode-pulse
 ```
 
-This gives the user a fast `pulse` command, which is recommended for tmux
-bindings (avoids the resolution overhead of bunx on every invocation).
+After installation, get the full paths to both bun and pulse:
+```bash
+which bun
+echo "$(bun pm bin -g)/pulse"
+```
+
+Save both paths — you'll need them for the tmux binding in Step 4.
+The pulse binary's shebang uses `#!/usr/bin/env bun`, but neither bun
+nor its global bin directory may be in tmux's default PATH. Use
+`which bun` for the bun path (it's in PATH now since the user is
+running bun commands) and `bun pm bin -g` for the global bin directory
+(don't use `which pulse` — it won't work if bun's bin dir isn't in PATH).
 
 ### Step 4: Ask about tmux integration
 
@@ -73,16 +83,19 @@ If the user says YES:
   Ask: "What key would you like to bind? (default: P, used as prefix + P)"
 
   Append this line to ~/.tmux.conf (create the file if it doesn't exist):
-    bind-key <KEY> display-popup -E -w 90% -h 50% pulse
+    bind-key <KEY> display-popup -E -w 90% -h 50% <BUN_PATH> <PULSE_PATH>
 
   Replace <KEY> with the user's choice (default: P).
+  Replace <BUN_PATH> with the absolute path to bun from Step 3.
+  Replace <PULSE_PATH> with the absolute path to pulse from Step 3.
+  (e.g. bind-key P display-popup -E -w 90% -h 50% /home/user/.bun/bin/bun /home/user/.bun/bin/pulse).
 
   If tmux is currently running, reload the config:
     tmux source-file ~/.tmux.conf 2>/dev/null || true
 
 ### Step 5: Verify and finish
 
-Run `pulse --help` to confirm the binary works.
+Run the full path to pulse with --help to confirm the binary works.
 
 Tell the user:
 - Restart any running OpenCode sessions for the plugin to take effect.
