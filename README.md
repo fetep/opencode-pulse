@@ -23,10 +23,10 @@ Restart OpenCode. The plugin installs automatically and begins tracking sessions
 ### 2. Run the TUI
 
 ```bash
-bunx --bun opencode-pulse
+bunx --bun opencode-pulse@latest
 ```
 
-Or install globally for a persistent `pulse` command:
+Or install globally for a faster `pulse` command (recommended for tmux bindings):
 
 ```bash
 bun add -g opencode-pulse
@@ -37,7 +37,7 @@ pulse
 <summary>npx</summary>
 
 ```bash
-npx opencode-pulse
+npx opencode-pulse@latest
 ```
 
 Bun must be installed — pulse uses `bun:sqlite` for database access.
@@ -45,10 +45,10 @@ Bun must be installed — pulse uses `bun:sqlite` for database access.
 
 ### 3. Tmux popup (optional)
 
-Add this to your `~/.tmux.conf` to pop up pulse with `prefix + P`:
+Install globally (see above), then add this to your `~/.tmux.conf` to pop up pulse with `prefix + P`:
 
 ```tmux
-bind-key P display-popup -E -w 90% -h 50% 'bunx --bun opencode-pulse'
+bind-key P display-popup -E -w 90% -h 50% pulse
 ```
 
 Select a session and pulse switches you there, closing the popup automatically.
