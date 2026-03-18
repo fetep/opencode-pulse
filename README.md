@@ -10,7 +10,7 @@ Select a session and pulse attaches you to its tmux pane, then exits.
 
 ### Install with your LLM
 
-Paste this into [OpenCode](https://opencode.ai), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), or any LLM coding agent:
+Paste this into [OpenCode](https://opencode.ai):
 
 ```
 Install and configure opencode-pulse: https://raw.githubusercontent.com/fetep/opencode-pulse/main/README.md
