@@ -18,7 +18,17 @@ gh pr list --head "$(git rev-parse --abbrev-ref HEAD)" --json number,url,state -
 - If on `main`: stop with an error — PRs should not be created from the default branch.
 - Note whether an open PR already exists. If so, you will **update** it instead of creating a new one.
 
-### Step 2: Ensure branch is pushed
+### Step 2: Rebase on latest main
+
+```bash
+git fetch origin
+git rebase origin/main
+```
+
+- If the rebase fails due to conflicts, stop and report the conflicting files. Do **not** continue with the PR.
+- If the rebase succeeds with no changes (branch is already up to date), continue normally.
+
+### Step 3: Ensure branch is pushed
 
 ```bash
 git status --porcelain
@@ -28,10 +38,10 @@ git log @{upstream}..HEAD --oneline 2>/dev/null
 - If there are uncommitted changes, warn the user and ask whether to proceed.
 - If the branch has no upstream or has unpushed commits, push it:
   ```bash
-  git push -u origin HEAD
+  git push --force-with-lease -u origin HEAD
   ```
 
-### Step 3: Collect commits
+### Step 4: Collect commits
 
 ```bash
 git log main..HEAD --format='%s%n%b%n---'
@@ -42,7 +52,7 @@ Parse each commit:
 - **Body**: everything after the first line (`%b`)
 - **Breaking**: a commit is breaking if its subject contains `!:` (e.g., `feat!:`, `fix(scope)!:`) OR its body contains `BREAKING CHANGE:` or `BREAKING-CHANGE:`
 
-### Step 4: Generate PR title
+### Step 5: Generate PR title
 
 Analyze all commit subjects to produce a concise PR title:
 
@@ -53,7 +63,7 @@ Analyze all commit subjects to produce a concise PR title:
   - If all commits share one type, reflect that (e.g., all `fix:` → "Fix ...")
   - Keep it under ~72 characters
 
-### Step 5: Build PR description
+### Step 6: Build PR description
 
 Construct the body using this structure:
 
@@ -75,7 +85,7 @@ If **any commits are breaking**, add a section:
 
 Do NOT include merge commits or fixup commits in the list.
 
-### Step 6: Create or update the PR
+### Step 7: Create or update the PR
 
 **If no open PR exists** (from Step 1):
 
@@ -95,7 +105,7 @@ EOF
 )"
 ```
 
-### Step 7: Report result
+### Step 8: Report result
 
 Output the PR URL and a brief summary:
 
