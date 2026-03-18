@@ -68,7 +68,7 @@ jobs:
             { cat /tmp/release-notes.md; echo ""; cat CHANGELOG.md; } > CHANGELOG.md.tmp
             mv CHANGELOG.md.tmp CHANGELOG.md
           else
-            { echo "# Changelog"; echo ""; cat /tmp/release-notes.md; } > CHANGELOG.md
+            cp /tmp/release-notes.md CHANGELOG.md
           fi
 
       - name: Commit, tag, and push
