@@ -8,6 +8,89 @@ Select a session and pulse attaches you to its tmux pane, then exits.
 
 > **Requires [Bun](https://bun.sh)**
 
+### Install with your LLM
+
+Paste this into [OpenCode](https://opencode.ai), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), or any LLM coding agent:
+
+```
+Install and configure opencode-pulse: https://raw.githubusercontent.com/fetep/opencode-pulse/main/README.md
+```
+
+Or follow the manual steps below.
+
+<!--
+## LLM Installation Guide
+
+If you are an LLM agent helping a user install opencode-pulse, follow this
+interactive workflow instead of having the user manually run each step.
+
+### Step 1: Check prerequisites
+
+Run these checks (don't ask the user, just detect):
+
+```bash
+command -v bun >/dev/null 2>&1 && echo "bun=$(bun --version)" || echo "bun=missing"
+command -v opencode >/dev/null 2>&1 && echo "opencode=found" || echo "opencode=missing"
+command -v tmux >/dev/null 2>&1 && echo "tmux=found" || echo "tmux=missing"
+command -v pulse >/dev/null 2>&1 && echo "pulse=already-installed" || echo "pulse=not-installed"
+```
+
+- bun missing → Tell the user to install Bun first (https://bun.sh) and stop.
+- opencode missing → Warn that OpenCode is needed, but proceed with installation.
+
+### Step 2: Add the plugin to OpenCode config
+
+Read the existing config:
+```bash
+cat ~/.config/opencode/opencode.json 2>/dev/null || cat ~/.config/opencode/opencode.jsonc 2>/dev/null || echo "no-config"
+```
+
+- If the file exists: add "opencode-pulse@latest" to the existing "plugin" array.
+  Preserve all other config entries.
+- If no config exists: create ~/.config/opencode/opencode.json with:
+  { "plugin": ["opencode-pulse@latest"] }
+- If "opencode-pulse" is already in the plugin array: skip this step.
+
+### Step 3: Install pulse globally
+
+```bash
+bun add -g opencode-pulse
+```
+
+This gives the user a fast `pulse` command, which is recommended for tmux
+bindings (avoids the resolution overhead of bunx on every invocation).
+
+### Step 4: Ask about tmux integration
+
+Only ask if tmux was detected in Step 1. Ask the user:
+
+  "Would you like a tmux popup keybinding for pulse? This lets you press a
+   key combo to pop up a session overview as an overlay."
+
+If the user says NO: skip to Step 5.
+
+If the user says YES:
+  Ask: "What key would you like to bind? (default: P, used as prefix + P)"
+
+  Append this line to ~/.tmux.conf (create the file if it doesn't exist):
+    bind-key <KEY> display-popup -E -w 90% -h 50% pulse
+
+  Replace <KEY> with the user's choice (default: P).
+
+  If tmux is currently running, reload the config:
+    tmux source-file ~/.tmux.conf 2>/dev/null || true
+
+### Step 5: Verify and finish
+
+Run `pulse --help` to confirm the binary works.
+
+Tell the user:
+- Restart any running OpenCode sessions for the plugin to take effect.
+- Run `pulse` (or press their tmux keybinding) to see active sessions.
+- Sessions appear once OpenCode starts generating events (status changes,
+  permissions, errors, etc.).
+-->
+
 ### 1. Enable the plugin
 
 Add `opencode-pulse` to your OpenCode config (`~/.config/opencode/opencode.json` or `~/.config/opencode/opencode.jsonc`):
