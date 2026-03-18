@@ -43,8 +43,18 @@ git log @{upstream}..HEAD --oneline 2>/dev/null
 
 ### Step 4: Collect commits
 
+**Important:** `git log main..HEAD` is unreliable when previous PRs were squash-merged — it will include commits whose changes are already on main. Instead, use `git cherry` to find only commits not yet merged:
+
 ```bash
-git log main..HEAD --format='%s%n%b%n---'
+git cherry -v origin/main HEAD
+```
+
+This outputs lines prefixed with `+` (unmerged) or `-` (already merged). Only use `+` lines. The format is `+ <sha> <subject>`.
+
+For each unmerged commit, get the full details:
+
+```bash
+git log <sha> -1 --format='%s%n%b%n---'
 ```
 
 Parse each commit:
