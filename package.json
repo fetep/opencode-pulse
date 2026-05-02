@@ -38,7 +38,7 @@
   "homepage": "https://github.com/fetep/opencode-pulse",
   "dependencies": {
     "@opentui/core": "^0.1.87",
-    "@opentui/react": "^0.1.87",
+    "@opentui/react": "^0.2.2",
     "citty": "^0.2.1",
     "jsonc-parser": "^3.3.1",
     "react": "^19.2.4"
